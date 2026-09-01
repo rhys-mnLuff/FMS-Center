@@ -1,0 +1,109 @@
+#include <SoftwareSerial.h>
+#include <avr/wdt.h>
+
+// --- PINS & HARDWARE ---
+SoftwareSerial hc12(2, 3);
+const int MOISTURE_PIN = A0;
+const int WATER_LEVEL_PIN = A1;
+const int SENSOR_POWER_PIN = 4;
+
+// --- CONFIGURATION ---
+const char NODE_ID[] = "1"; // Change for each physical node (e.g., "1", "2", "3")
+const unsigned long READ_INTERVAL_MS = 10000;
+
+unsigned long lastReadTime = 0;
+
+// --- MESH NETWORK LOGIC ---
+char lastRelayedPacket[32] = ""; // Fixed-size memory for the last bounced packet
+unsigned long lastRelayTime = 0;
+
+int getStableReading(int pin) {
+  long total = 0;
+  for(int i = 0; i < 5; i++) {
+    total += analogRead(pin);
+    delay(10);
+  }
+  return total / 5; // Average of 5 readings
+}
+
+void setup() {
+  Serial.begin(9600);
+  hc12.begin(9600);
+
+  pinMode(MOISTURE_PIN, INPUT);
+  pinMode(WATER_LEVEL_PIN, INPUT);
+
+  // Setup power control for sensors
+  pinMode(SENSOR_POWER_PIN, OUTPUT);
+  digitalWrite(SENSOR_POWER_PIN, LOW);
+
+  Serial.print("Sensor Node ");
+  Serial.print(NODE_ID);
+  Serial.println(" Starting...");
+
+  wdt_enable(WDTO_8S);
+}
+
+void loop() {
+  wdt_reset();
+
+  unsigned long currentMillis = millis();
+
+  // --- 1. MESH RELAY: Listen and Bounce ---
+  if (hc12.available()) {
+    String incomingData = hc12.readStringUntil('\n');
+    incomingData.trim();
+
+    // Check for clean packet boundaries
+    if (incomingData.startsWith("<") && incomingData.endsWith(">")) {
+
+      // Create a marker to check if this is our own data (e.g., "<1,")
+      char ownMarker[10];
+      sprintf(ownMarker, "<%s,", NODE_ID);
+
+      // Prevent infinite loops: Don't bounce our own data, and don't bounce data we just bounced
+      if (incomingData.indexOf(ownMarker) == -1 && incomingData != String(lastRelayedPacket)) {
+
+        delay(random(50, 200)); // Random delay prevents radio collisions
+        hc12.println(incomingData); // BOUNCE IT!
+
+        // Save to our fixed-size bounce memory
+        incomingData.toCharArray(lastRelayedPacket, 32);
+        lastRelayTime = currentMillis;
+
+        Serial.print("Bounced: ");
+        Serial.println(incomingData);
+      }
+    }
+  }
+
+  // Clear the bounce memory after 5 seconds to keep the network fresh
+  if (currentMillis - lastRelayTime > 5000) {
+    lastRelayedPacket[0] = '\0';
+  }
+
+  // --- 2. NORMAL TRANSMIT: Send Own Data ---
+  if (currentMillis - lastReadTime >= READ_INTERVAL_MS) {
+    lastReadTime = currentMillis;
+
+    // Power ON sensors briefly
+    digitalWrite(SENSOR_POWER_PIN, HIGH);
+    delay(50);
+
+    int soilMoisture = getStableReading(MOISTURE_PIN);
+    int waterLevel = getStableReading(WATER_LEVEL_PIN);
+
+    // Power OFF sensors instantly to stop corrosion
+    digitalWrite(SENSOR_POWER_PIN, LOW);
+
+    // Memory-Safe Data Formatting
+    char dataPacket[32];
+    sprintf(dataPacket, "<%s,%d,%d>", NODE_ID, soilMoisture, waterLevel);
+
+    // Transmit via HC-12
+    hc12.println(dataPacket);
+
+    Serial.print("Transmitted: ");
+    Serial.println(dataPacket);
+  }
+}
