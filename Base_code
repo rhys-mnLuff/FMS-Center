@@ -1,0 +1,224 @@
+#include <SoftwareSerial.h>
+#include <avr/wdt.h>
+
+SoftwareSerial hc12(2, 3);
+SoftwareSerial sim7600(10, 11);
+
+/* =============================================================
+   FIXES APPLIED (read before flashing):
+
+   1. COMPILE ERROR FIXED: API_KEY_NODE_2 and API_KEY_NODE_3 were
+      used in sendToThingSpeak() but never declared. Added below
+      as placeholders, fill in your real ThingSpeak (or new app)
+      write keys per node.
+
+   2. SOIL THRESHOLD DIRECTION FIXED: your own calibration data
+      (this session, Aug 31 2026) showed DRY averages ~875 raw,
+      SATURATED averages ~385 raw - lower raw value means wetter.
+      The original code fired on "soilMoisture > 200", which is
+      true for BOTH dry and saturated soil, so it would have
+      alerted almost constantly. Changed to "< SOIL_ALERT_THRESHOLD"
+      and moved the threshold to 450 (between your saturated mean
+      of 385 and field capacity, which you haven't finished
+      calibrating yet). TREAT 450 AS A PLACEHOLDER - replace it
+      with a real number once field capacity calibration is done,
+      same as moisture_alert_logic.ino does with TRIGGER_PCT.
+
+   3. SERVER ENDPOINT IS NOW CONFIGURABLE: pulled the ThingSpeak
+      URL apart into SERVER_HOST / SERVER_PATH constants. Once the
+      new custom app is live, you only change those two lines,
+      nothing else in sendToThingSpeak() needs to change AS LONG AS
+      the new app accepts the same query-string format ThingSpeak
+      does (api_key, field1, field2, field3, lat, long). See the
+      web app brief for why that matters.
+
+   4. WATER_ALERT_THRESHOLD direction NOT changed - that sensor
+      hasn't been calibrated the way soil moisture has, so I don't
+      know its polarity yet. Verify direction before trusting it.
+   ============================================================= */
+
+const int SOIL_ALERT_THRESHOLD = 450;   // PLACEHOLDER - see note 2 above. Was 200 with wrong direction.
+const int WATER_ALERT_THRESHOLD = 200;  // NOT YET VERIFIED - see note 4 above.
+const int SOIL_WILTING_POINT = 800;
+const int SOIL_OPTIMAL_POINT = 400;
+
+const int NUM_PHONES = 1;
+const String FARMER_PHONES[NUM_PHONES] = { "+1234567890" };
+
+unsigned long lastSmsTime = 0;
+const unsigned long SMS_COOLDOWN_MS = 3600000;
+const String CELLULAR_APN = "internet";
+
+// --- MULTI-NODE API KEYS ---
+// Put your unique write keys here for each node's channel.
+const String API_KEY_NODE_1 = "O3JGLAD7IX4P67IE";
+const String API_KEY_NODE_2 = "REPLACE_WITH_NODE_2_KEY"; // was missing, added as placeholder
+const String API_KEY_NODE_3 = "REPLACE_WITH_NODE_3_KEY"; // was missing, added as placeholder
+
+// --- SERVER ENDPOINT (swap these two lines once the custom app is live) ---
+const String SERVER_HOST = "api.thingspeak.com";
+const String SERVER_PATH = "/update";
+
+int latestSoil = 0;
+int latestWater = 0;
+String latestNode = "N/A";
+String latLong = "0.0,0.0";
+
+void setup() {
+  Serial.begin(9600);
+  hc12.begin(9600);
+  sim7600.begin(9600);
+  Serial.println("Base Module Starting...");
+
+  sim7600.listen();
+  delay(1000);
+  sim7600.println("AT+CMGF=1");
+  delay(500);
+  sim7600.println("AT+CNMI=1,2,0,0,0");
+  delay(500);
+  sim7600.println("AT+CGNSSPWR=1");
+  delay(1000);
+
+  wdt_enable(WDTO_8S);
+  hc12.listen();
+}
+
+void loop() {
+  wdt_reset();
+  checkIncomingSMS();
+
+  hc12.listen();
+  if (hc12.available()) {
+    String incomingData = hc12.readStringUntil('\n');
+    incomingData.trim();
+
+    int startMarker = incomingData.indexOf('<');
+    int endMarker = incomingData.indexOf('>');
+
+    if (startMarker >= 0 && endMarker > startMarker) {
+      String cleanData = incomingData.substring(startMarker + 1, endMarker);
+      int firstComma = cleanData.indexOf(',');
+      int secondComma = cleanData.indexOf(',', firstComma + 1);
+
+      if (firstComma > 0 && secondComma > 0) {
+        latestNode = cleanData.substring(0, firstComma);
+        latestSoil = cleanData.substring(firstComma + 1, secondComma).toInt();
+        latestWater = cleanData.substring(secondComma + 1).toInt();
+
+        int healthIndex = calculateSoilHealth(latestSoil);
+        updateGPS();
+
+        // --- ROUTE DATA TO CORRECT DASHBOARD/APP ---
+        sendToThingSpeak(latestNode, latestSoil, latestWater, healthIndex);
+
+        // Soil: alert on LOW raw value (wetter). Water: alert on HIGH raw value (unverified, see note 4).
+        if (latestSoil < SOIL_ALERT_THRESHOLD || latestWater > WATER_ALERT_THRESHOLD) {
+           triggerAlert(latestNode, latestSoil, latestWater);
+        }
+      }
+    }
+  }
+}
+
+void checkIncomingSMS() {
+  sim7600.listen();
+  unsigned long startListen = millis();
+  while(millis() - startListen < 1000) {
+    if (sim7600.available()) {
+      String smsData = sim7600.readString();
+      if (smsData.indexOf("STATUS") >= 0) {
+        updateGPS();
+        String report = "FMS STATUS: Node " + latestNode + "\nSoil: " + String(latestSoil) + "\nWater: " + String(latestWater) + "\nMap: https://maps.google.com/?q=" + latLong;
+        sendSMS(report);
+      }
+    }
+  }
+}
+
+void updateGPS() {
+  sim7600.listen();
+  sim7600.println("AT+CGNSSINFO");
+  unsigned long timeout = millis();
+  while(millis() - timeout < 2000) {
+    if(sim7600.available()) {
+      String gpsRaw = sim7600.readString();
+      if(gpsRaw.indexOf(",N,") > 0 || gpsRaw.indexOf(",S,") > 0) {
+        // TODO: this still hardcodes a placeholder instead of parsing gpsRaw.
+        // Fine for bench testing, but the web app will show a fake, fixed
+        // location until this actually parses real coordinates out of gpsRaw.
+        latLong = "14.5333,121.0000"; // Placeholder for prototype
+      }
+    }
+  }
+}
+
+void triggerAlert(const String& node, int soil, int water) {
+  unsigned long currentMillis = millis();
+  if (lastSmsTime == 0 || (currentMillis - lastSmsTime >= SMS_COOLDOWN_MS)) {
+    updateGPS();
+    String alertMsg = "FLOOD ALERT - Node " + node + "!\nSoil: " + String(soil) + "\nWater: " + String(water) + "\nLoc: https://maps.google.com/?q=" + latLong;
+    sendSMS(alertMsg);
+    lastSmsTime = currentMillis;
+  }
+}
+
+void sendSMS(const String& message) {
+  sim7600.listen();
+  while(sim7600.available()) { sim7600.read(); }
+  for (int i = 0; i < NUM_PHONES; i++) {
+    sim7600.print("AT+CMGS=\"");
+    sim7600.print(FARMER_PHONES[i]);
+    sim7600.println("\"");
+    delay(1000);
+    sim7600.print(message);
+    delay(100);
+    sim7600.write(26);
+    delay(4000);
+  }
+  hc12.listen();
+}
+
+int calculateSoilHealth(int soilMoisture) {
+  if (soilMoisture >= SOIL_WILTING_POINT) return 0;
+  if (soilMoisture <= SOIL_ALERT_THRESHOLD) return 20;
+  int healthScore = map(soilMoisture, SOIL_WILTING_POINT, SOIL_OPTIMAL_POINT, 0, 100);
+  return constrain(healthScore, 0, 100);
+}
+
+// --- DYNAMIC ROUTING, CONFIGURABLE SERVER ---
+void sendToThingSpeak(String nodeID, int soil, int water, int healthIndex) {
+  String targetKey = "";
+
+  if (nodeID == "1") targetKey = API_KEY_NODE_1;
+  else if (nodeID == "2") targetKey = API_KEY_NODE_2;
+  else if (nodeID == "3") targetKey = API_KEY_NODE_3;
+  else return; // Ignore unknown nodes
+
+  sim7600.listen();
+  sim7600.println("AT+CGDCONT=1,\"IP\",\"" + CELLULAR_APN + "\"");
+  delay(1000);
+  sim7600.println("AT+HTTPINIT");
+  delay(500);
+
+  // Uses SERVER_HOST/SERVER_PATH so this can point at the new app later
+  // by changing two constants at the top of the file, nothing here.
+  String url = "AT+HTTPPARA=\"URL\",\"http://" + SERVER_HOST + SERVER_PATH + "?api_key=";
+  url += targetKey;
+  url += "&field1=" + String(soil);
+  url += "&field2=" + String(water);
+  url += "&field3=" + String(healthIndex);
+
+  // Parse our latLong string to format it (Format: lat=XX&long=YY)
+  int commaIndex = latLong.indexOf(',');
+  String lat = latLong.substring(0, commaIndex);
+  String lon = latLong.substring(commaIndex + 1);
+  url += "&lat=" + lat + "&long=" + lon + "\"";
+
+  sim7600.println(url);
+  delay(1000);
+  sim7600.println("AT+HTTPACTION=0");
+  delay(2000);
+  sim7600.println("AT+HTTPTERM");
+  delay(500);
+  hc12.listen();
+}
