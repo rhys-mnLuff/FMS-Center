@@ -117,6 +117,4 @@ Rhys Luffman, International School Manila, class of 2027.
 MIT
 
 ## Contact
-
-Partnerships: [partner email]
-Technical questions: [tech email]
+Technical questions: fms-sales@luffmans.com
