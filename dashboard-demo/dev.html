@@ -181,14 +181,16 @@
   .diag-empty{text-align:center; color:var(--muted); font-size:12.5px; padding:30px 10px;}
 
   /* charts */
-  .chart-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(400px,1fr)); gap:12px;}
+  .chart-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:12px;}
+  .chart-grid > *{min-width:0;}
   .chart-card{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:14px 16px;}
   .chart-card h4{font-size:12px; font-weight:600; margin:0 0 1px;}
   .chart-card .c-sub{font-size:10.5px; color:var(--muted); margin-bottom:8px;}
-  .chart-card canvas{max-height:200px;}
+  .chart-card canvas{max-height:200px; max-width:100%;}
 
   /* ---- flood prediction ---- */
   .predict-wrap{display:grid; grid-template-columns:minmax(300px,0.85fr) 1.15fr; gap:12px; align-items:start;}
+  .predict-wrap > *{min-width:0;}
   @media (max-width:1000px){ .predict-wrap{grid-template-columns:1fr;} }
   .map-legend{display:flex; flex-wrap:wrap; gap:12px; margin-top:9px; font-size:10.5px; color:var(--muted);}
   .map-legend i{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align:baseline;}
@@ -226,7 +228,8 @@
   .pm .k{font-size:9px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .pm .v{font-family:var(--mono); font-size:13.5px; font-weight:600; margin-top:3px; font-variant-numeric:tabular-nums; line-height:1.25;}
   .pm .s{font-size:9.5px; color:var(--muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .predict-chart-box{height:190px; margin-bottom:10px;}
+  .predict-chart-box{height:190px; margin-bottom:10px; min-width:0; position:relative;}
+  .predict-chart-box canvas{position:absolute; inset:0; width:100%!important; height:100%!important;}
   .predict-note{font-size:10.5px; color:var(--muted); line-height:1.6; border-top:1px solid var(--line); padding-top:9px;}
   /* Cascade strip: rain → soil → saturation → standing water. Steps light up
      as each is met, so how far an event has progressed is readable at a glance. */
@@ -261,8 +264,12 @@
   }
 
   /* ---- per-node detail cards ---- */
-  .node-detail-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:12px;}
-  .nd-card{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:14px 16px;}
+  /* Grid items default to min-width:auto, which lets a canvas's intrinsic
+     width push the track wider than 1fr and overflow the page. Every level
+     that wraps a chart has to opt out of that. */
+  .node-detail-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:12px;}
+  .node-detail-grid > *{min-width:0;}
+  .nd-card{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:14px 16px; min-width:0; overflow:hidden;}
   .nd-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px;}
   .nd-name{font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:7px;}
   .nd-name i{width:8px; height:8px; border-radius:50%; flex:none;}
@@ -277,10 +284,12 @@
   .nd-bar .f{height:100%; border-radius:2px; transition:width .3s;}
   .nd-bar .f.good{background:var(--green);} .nd-bar .f.mid{background:var(--amber);} .nd-bar .f.bad{background:var(--red);}
   .nd-charts{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .nd-charts > *{min-width:0;}
   @media (max-width:520px){ .nd-charts{grid-template-columns:1fr;} }
   .nd-chart h5{font-size:10px; font-weight:600; margin:0 0 1px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.5px;}
   .nd-chart .nd-cs{font-size:9.5px; color:var(--muted); margin-bottom:5px; font-family:var(--mono);}
-  .nd-chart-box{height:84px;}
+  .nd-chart-box{height:84px; min-width:0; position:relative;}
+  .nd-chart-box canvas{position:absolute; inset:0; width:100%!important; height:100%!important;}
   .nd-foot{display:flex; gap:14px; flex-wrap:wrap; margin-top:11px; padding-top:9px; border-top:1px solid var(--line); font-size:10.5px; color:var(--muted);}
   .nd-foot b{font-family:var(--mono); color:var(--ink-soft); font-weight:600;}
   .chart-legend{display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;}
@@ -627,7 +636,9 @@ const RESET_COUNT = 3;
 
 // --- Soil zone edges. Only the two ends are measured; see SOIL_ZONES. -----
 const SOIL_FAULT_FLOOR = 960;       // at/above this the probe is out of soil
-const SOIL_CRIT_DRY_FLOOR = 829;
+const SOIL_CRIT_DRY_FLOOR = Math.round(SOIL_DRY_MEAN - 2*SOIL_DRY_SD);  // 829
+const SOIL_DRYING_CEIL = 828;
+const SOIL_CRIT_DRY_CEIL = 959;
 const SOIL_DRYING_FLOOR = 700;
 const SOIL_HEALTHY_FLOOR = 552;     // ESTIMATED — clay-loam literature
 const SOIL_HEALTHY_CEIL = 699;      // ESTIMATED — clay-loam literature
@@ -651,8 +662,8 @@ const SOIL_ZONES = [
   {max:SOIL_FLOOD_THRESHOLD,   key:"saturated", short:"Saturated",  label:"Saturated",          health:"Roots flooding",     flood:"Flood risk", cls:"bad",  est:false},
   {max:SOIL_WATCH_THRESHOLD,   key:"wet",       short:"Too wet",    label:"Wetter than ideal",  health:"Waterlogging risk",  flood:"Watch",      cls:"warn", est:true},
   {max:SOIL_HEALTHY_CEIL,      key:"healthy",   short:"Healthy",    label:"Healthy",            health:"Good for crops",     flood:"No risk",    cls:"good", est:true},
-  {max:SOIL_DRYING_FLOOR+128,  key:"drying",    short:"Drying",     label:"Drying out",         health:"Needs water soon",   flood:"No risk",    cls:"warn", est:false},
-  {max:SOIL_FAULT_FLOOR-1,     key:"crit_dry",  short:"Very dry",   label:"Critically dry",     health:"Drought stress",     flood:"No risk",    cls:"bad",  est:false},
+  {max:SOIL_DRYING_CEIL,        key:"drying",    short:"Drying",     label:"Drying out",         health:"Needs water soon",   flood:"No risk",    cls:"warn", est:false},
+  {max:SOIL_CRIT_DRY_CEIL,      key:"crit_dry",  short:"Very dry",   label:"Critically dry",     health:"Drought stress",     flood:"No risk",    cls:"bad",  est:false},
   {max:Infinity,               key:"fault",     short:"Fault",      label:"Probe out of soil",  health:"Sensor fault",       flood:"Ignore",     cls:"bad",  est:false}
 ];
 function soilZone(raw){ return SOIL_ZONES.find(z => raw <= z.max); }
@@ -682,8 +693,10 @@ function rainIntensityPct(raw){
   return Math.round(rainWet(raw)*100);
 }
 function riskScore(wetnessPct, water){
-  const waterPct = Math.max(0, Math.min(100, water/300*100));
-  return Math.max(0, Math.min(100, wetnessPct*0.65 + waterPct*0.35));
+  // Water is the brief's most direct flood signal, so it carries the larger
+  // weight once the probe is actually in contact. Display aggregate only.
+  const waterPct = waterWet(water)*100;
+  return Math.max(0, Math.min(100, wetnessPct*0.45 + waterPct*0.55));
 }
 
 /* =========================================================================
@@ -980,18 +993,26 @@ function evaluateAlertState(node, silent){
     (node.soil > SOIL_CLEAR_THRESHOLD && node.water <= WATER_FLOOD_THRESHOLD && a.level <= 1);
   const prevState = node.state;
 
-  if (node.state === "NORMAL"){
-    if (triggered){ node.state = "WATCHING"; node.overCount = 1; }
-  } else if (node.state === "WATCHING"){
-    if (triggered){
-      node.overCount++;
-      if (node.overCount >= SUSTAIN_COUNT){ node.state = "ALERTED"; fireAlert(node, silent); }
-    } else if (cleared){ node.state = "NORMAL"; node.overCount = 0; }
-  } else if (node.state === "ALERTED"){
-    if (cleared){
-      node.underCount = (node.underCount||0) + 1;
-      if (node.underCount >= RESET_COUNT){ node.state = "NORMAL"; node.underCount = 0; node.overCount = 0; }
-    } else { node.underCount = 0; }
+  if (triggered){
+    node.overCount++;
+    if (node.overCount >= SUSTAIN_COUNT){
+      if (node.state !== "ALERTED"){ node.state = "ALERTED"; fireAlert(node, silent); }
+      node.underCount = 0;
+    } else if (node.state !== "ALERTED"){
+      node.state = "WATCHING";
+    }
+  } else {
+    node.overCount = 0;
+    if (node.state === "ALERTED"){
+      if (cleared){
+        node.underCount = (node.underCount||0) + 1;
+        if (node.underCount >= RESET_COUNT){ node.state = LEVEL_STATE[a.level]; node.underCount = 0; }
+      } else { node.underCount = 0; }
+    } else {
+      // Below the alert line the displayed state just tracks the level, so
+      // an L1 Watch never reads as "Safe" in the table.
+      node.state = LEVEL_STATE[a.level];
+    }
   }
   if (!silent && prevState !== node.state){
     logLine(`ALERT Node ${node.id} state ${prevState} → ${node.state}`, "state");
