@@ -218,13 +218,47 @@
   .verdict.calm .v-eta{color:var(--green);} .verdict.watch .v-eta{color:var(--amber);} .verdict.urgent .v-eta{color:var(--red);}
   .verdict .v-text{font-size:12px; line-height:1.55; color:var(--ink-soft);}
   .verdict .v-text b{color:var(--ink);}
-  .predict-metrics{display:grid; grid-template-columns:repeat(auto-fit,minmax(112px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--radius-sm); overflow:hidden; margin-bottom:12px;}
-  .pm{background:var(--card); padding:9px 11px;}
-  .pm .k{font-size:9.5px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); font-weight:600;}
-  .pm .v{font-family:var(--mono); font-size:14px; font-weight:600; margin-top:3px; font-variant-numeric:tabular-nums;}
-  .pm .s{font-size:10px; color:var(--muted); margin-top:1px;}
+  /* Fixed 7 across so the row never orphans a stretched last cell. */
+  .predict-metrics{display:grid; grid-template-columns:repeat(7,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--radius-sm); overflow:hidden; margin-bottom:12px;}
+  @media (max-width:1180px){ .predict-metrics{grid-template-columns:repeat(4,1fr);} }
+  @media (max-width:640px){ .predict-metrics{grid-template-columns:repeat(2,1fr);} }
+  .pm{background:var(--card); padding:8px 10px; min-width:0;}
+  .pm .k{font-size:9px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .pm .v{font-family:var(--mono); font-size:13.5px; font-weight:600; margin-top:3px; font-variant-numeric:tabular-nums; line-height:1.25;}
+  .pm .s{font-size:9.5px; color:var(--muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .predict-chart-box{height:190px; margin-bottom:10px;}
   .predict-note{font-size:10.5px; color:var(--muted); line-height:1.6; border-top:1px solid var(--line); padding-top:9px;}
+  /* Cascade strip: rain → soil → saturation → standing water. Steps light up
+     as each is met, so how far an event has progressed is readable at a glance. */
+  .cascade{display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-bottom:12px;}
+  .cs{
+    font-family:var(--mono); font-size:10.5px; padding:4px 9px; border-radius:var(--radius-sm);
+    border:1px solid var(--card-border); color:var(--muted); background:var(--bg-soft);
+  }
+  .cs.on{border-color:var(--red); color:var(--red); background:var(--red-bg); font-weight:600;}
+  .cs-arrow{color:var(--muted); font-size:10px;}
+
+  /* Provenance: what is measured, estimated, untested, invented. The brief is
+     explicit that estimated values must never read as test results. */
+  .prov{display:grid; grid-template-columns:repeat(4,1fr); gap:22px;}
+  @media (max-width:1000px){ .prov{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:620px){ .prov{grid-template-columns:1fr;} }
+  .prov-col h5{
+    font-size:10px; text-transform:uppercase; letter-spacing:.7px; font-weight:600;
+    margin:0 0 9px; padding-bottom:6px; border-bottom:1px solid var(--line);
+  }
+  .prov-col h5.ok{color:var(--green);} .prov-col h5.est-h{color:var(--amber);}
+  .prov-col h5.warn-h{color:var(--water);} .prov-col h5.sim-h{color:var(--purple);}
+  .prov-col ul{margin:0; padding:0; list-style:none;}
+  .prov-col li{font-size:11.5px; color:var(--ink-soft); padding:3px 0; font-family:var(--mono);}
+  .prov-col .pv{color:var(--muted); font-size:10px;}
+  .prov-col p{font-size:10.5px; color:var(--muted); line-height:1.55; margin-top:9px;}
+  /* Marks a value that came from literature rather than our own bench tests. */
+  .est{
+    font-family:var(--mono); font-size:8.5px; font-weight:600; letter-spacing:.04em;
+    color:var(--amber); background:var(--amber-bg); border-radius:3px; padding:1px 4px;
+    vertical-align:2px; text-transform:uppercase;
+  }
 
   /* ---- per-node detail cards ---- */
   .node-detail-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(340px,1fr)); gap:12px;}
@@ -359,15 +393,10 @@
     <button id="toggle-signal">Simulate weak signal</button>
   </div>
 
-  <div class="banner">
-    <svg class="icon" viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-    <div>This is the internal diagnostics view — raw ADC values, internal debounce counters, and every simplification this demo makes relative to the shipped firmware are shown plainly here. See <b>Known Simplifications</b> near the bottom before quoting any of this as literal firmware behavior.</div>
-  </div>
-
-  <div class="section-title"><h2>Fleet — Compiled Stats</h2><span>aggregated live across all nodes</span></div>
+  <div class="section-title"><h2>Fleet — Compiled Stats</h2></div>
   <div class="stat-grid" id="fleet-stats"></div>
 
-  <div class="section-title"><h2>Nodes — Raw Telemetry</h2><span>every field, no rounding, no plain-language translation</span></div>
+  <div class="section-title"><h2>Nodes — Raw Telemetry</h2></div>
   <div class="table-wrap">
     <table>
       <thead><tr>
@@ -386,8 +415,7 @@
   <div class="predict-wrap">
     <div class="panel predict-map-panel">
       <h4>Field Map</h4>
-      <div class="c-sub">Click a node marker to run its projection. Base station, 3 field nodes, planned rain gauge.</div>
-      <div id="map"></div>
+            <div id="map"></div>
       <div class="map-legend">
         <span><i style="background:var(--green)"></i>Normal</span>
         <span><i style="background:var(--amber)"></i>Watching</span>
@@ -410,7 +438,7 @@
     </div>
   </div>
 
-  <div class="section-title"><h2>Rain Detection Node <span class="row-badge planned" style="margin-left:6px;">Planned hardware</span></h2><span>not yet deployed — modeled for integration testing</span></div>
+  <div class="section-title"><h2>Rain Detection Node <span class="row-badge planned" style="margin-left:6px;">Planned hardware</span></h2></div>
   <div class="rain-card">
     <div class="rain-head">
       <div class="rh-icon"><svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M17 15a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.6 1.7A4 4 0 0 0 7 17h10Z"/><path d="M9 19v1M12 19v2M15 19v1"/></svg></div>
@@ -430,32 +458,28 @@
         <div class="rain-stat-row"><span class="rs-label">Last reading</span><span class="rs-value" id="rain-lastseen">—</span></div>
       </div>
     </div>
-    <div class="rain-note">Not built yet — modeled as an analog resistive rain sensor (same family as the existing soil/water probes) mounted centrally, since rainfall is regional rather than per-field. Polarity (assumed: lower raw = heavier rain, matching the soil sensor), thresholds, and even the sensor type itself are placeholders pending real hardware and a calibration pass — nothing here is derived data.</div>
+    <div class="rain-note">Not built. Sensor type, polarity and thresholds are placeholders.</div>
   </div>
 
-  <div class="section-title"><h2>Per-Node Sensors</h2><span>each node on its own axes, with its live soil health index</span></div>
+  <div class="section-title"><h2>Per-Node Sensors</h2></div>
   <div class="node-detail-grid" id="node-detail-grid"></div>
 
-  <div class="section-title"><h2>Fleet Charts</h2><span>all nodes overlaid · last 60 readings each</span></div>
+  <div class="section-title"><h2>Fleet Charts</h2></div>
   <div class="chart-grid">
-    <div class="chart-card"><h4>Soil Moisture — raw ADC</h4><div class="c-sub">Lower = wetter. Threshold 450, wilting 800.</div><canvas id="chart-soil"></canvas></div>
-    <div class="chart-card"><h4>Water Level — raw ADC</h4><div class="c-sub">Higher = more water. Threshold 200 — polarity unverified.</div><canvas id="chart-water"></canvas></div>
-    <div class="chart-card"><h4>Soil Health Index</h4><div class="c-sub">0–100, calculateSoilHealth().</div><canvas id="chart-health"></canvas></div>
-    <div class="chart-card"><h4>Flood Risk (composite)</h4><div class="c-sub">0–100, display-only aggregate.</div><canvas id="chart-risk"></canvas></div>
-    <div class="chart-card"><h4>Rate of Change</h4><div class="c-sub">%/min wetness change, flags rapid rises.</div><canvas id="chart-rate"></canvas></div>
-    <div class="chart-card"><h4>Rain Intensity — raw ADC <span class="row-badge planned">planned</span></h4><div class="c-sub">Central Rain Gauge · not yet built.</div><canvas id="chart-rain"></canvas></div>
-    <div class="chart-card"><h4>Battery — % <span class="row-badge planned">speculative</span></h4><div class="c-sub">No real sensor exists yet — simulated day/night solar cycle.</div><canvas id="chart-battery"></canvas></div>
+    <div class="chart-card"><h4>Soil Moisture — raw ADC</h4><canvas id="chart-soil"></canvas></div>
+    <div class="chart-card"><h4>Water Level — raw ADC</h4><canvas id="chart-water"></canvas></div>
+    <div class="chart-card"><h4>Soil Health Index</h4><canvas id="chart-health"></canvas></div>
+    <div class="chart-card"><h4>Flood Risk (composite)</h4><canvas id="chart-risk"></canvas></div>
+    <div class="chart-card"><h4>Rate of Change</h4><canvas id="chart-rate"></canvas></div>
+    <div class="chart-card"><h4>Rain Intensity — raw ADC <span class="row-badge planned">planned</span></h4><canvas id="chart-rain"></canvas></div>
+    <div class="chart-card"><h4>Battery — % <span class="row-badge planned">speculative</span></h4><canvas id="chart-battery"></canvas></div>
   </div>
   <div class="chart-legend" id="chart-legend"></div>
 
-  <div class="section-title"><h2>Manual Analysis</h2><span>on-demand only — nothing here runs automatically</span></div>
-  <div class="banner" style="margin-bottom:12px;">
-    <svg class="icon" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
-    <div>Click <b>Run Fleet Diagnostic</b> above to generate a snapshot report — node-by-node health, battery trend, and recommendations based on current readings. Each run is timestamped and kept below; nothing here refreshes on its own.</div>
-  </div>
-  <div id="diagnostic-history"><div class="diag-empty">No diagnostic run yet — click "Run Fleet Diagnostic" above.</div></div>
+  <div class="section-title"><h2>Manual Analysis</h2></div>
+  <div id="diagnostic-history"><div class="diag-empty">No diagnostic run yet.</div></div>
 
-  <div class="section-title"><h2>Alerts &amp; Events Log</h2><span>everything the alert pipeline does, including suppressed sends</span></div>
+  <div class="section-title"><h2>Alerts &amp; Events Log</h2></div>
   <div class="table-wrap">
     <table>
       <thead><tr><th style="width:140px;">Time</th><th>Node</th><th>Event</th><th>Detail</th></tr></thead>
@@ -463,21 +487,20 @@
     </table>
   </div>
 
-  <div class="section-title"><h2>Weather Check</h2><span>live regional data, Open-Meteo</span></div>
+  <div class="section-title"><h2>Weather Check</h2></div>
   <div class="split">
     <div class="panel">
       <h4>Right now near the farm</h4>
-      <div class="c-sub">Live fetch — the one part of this console that talks to the real internet.</div>
-      <div id="weather-card"><div class="weather-loading">Fetching live weather…</div></div>
+            <div id="weather-card"><div class="weather-loading">Fetching live weather…</div></div>
     </div>
   </div>
 
-  <div class="section-title"><h2>Live Packet Console</h2><span>wire format is real; RX-side log lines are illustrative (see notes)</span></div>
+  <div class="section-title"><h2>Live Packet Console</h2></div>
   <div class="panel">
     <div class="console" id="console"></div>
   </div>
 
-  <div class="section-title"><h2>Calibration Status</h2><span>CALIBRATION_DATA.md, run 2026-08-31 — plus a live Field-Capacity wizard</span></div>
+  <div class="section-title"><h2>Calibration Status</h2></div>
   <div class="panel">
     <table>
       <thead><tr><th>Category</th><th>n</th><th>Mean (raw)</th><th>Min</th><th>Max</th></tr></thead>
@@ -518,31 +541,51 @@
     </div>
   </div>
 
-  <div class="section-title"><h2>Fleet Economics</h2><span>HARDWARE.md's target cost ceiling, not a finalized itemized BOM</span></div>
+  <div class="section-title"><h2>Fleet Economics</h2></div>
   <div class="panel">
     <div class="stat-grid" id="economics-stats"></div>
     <div style="font-size:11px; color:var(--muted); margin-top:12px; line-height:1.5;">$120/node is the project's cost <i>ceiling</i>, not yet a summed line-item total (HARDWARE.md's own "Known gaps" note) — no BOM with priced parts exists in the repo yet. $1,000 is used here as a round, conservative floor for commercial flood-telemetry hardware per the README's framing; real competitor pricing varies and isn't itemized in this repo either.</div>
   </div>
 
-  <div class="section-title"><h2>Known Simplifications</h2><span>read this before treating anything above as literal firmware behavior</span></div>
-  <div class="panel" style="line-height:1.7; font-size:12px; color:var(--ink-soft);">
-    <ul style="margin:0; padding-left:18px;">
-      <li><b>Debounce/hysteresis state machine</b> (Safe → Watch → Flood Risk) matches the <i>design</i> in CALIBRATION.md for <code>moisture_alert_logic.ino</code> — soil-only, and per the doc "not yet wired to SMS." The shipped <code>base_station.ino</code> fires instantly on the first threshold-crossing reading for either sensor. This console runs the proposed debounce logic for both.</li>
-      <li><b>Reset thresholds</b> (soil 500; water uses its own alert threshold, 200, since no water hysteresis is documented) are demo placeholders, exactly as CALIBRATION.md labels its own <code>TRIGGER_PCT</code>/<code>RESET_PCT</code>.</li>
-      <li><b>Global SMS cooldown</b> (1 hour, shared across every node, not per-node) is modeled faithfully from Base_code's single <code>lastSmsTime</code> variable — watch the Events log for "suppressed" entries.</li>
-      <li><b>Water sensor direction is unverified</b> in the real firmware (Base_code's own comment). This console uses the code's current, unverified direction.</li>
-      <li><b>"Relayed via" a specific node</b> is illustrative. The real mesh (Sensor_code) is undirected flood-broadcast with no hop-count or path field — the base station can't actually know a packet was relayed, let alone by whom.</li>
-      <li><b>Rain Detection Node is entirely speculative</b> — no such hardware exists in the repo yet. Sensor type, polarity, and thresholds here are placeholders modeled after the existing soil sensor for planning purposes only.</li>
-      <li><b>Cellular signal and cloud-upload failures are simulated</b> — the base station's SIM7600/A7670 does support the real <code>AT+CSQ</code> command this models, but the firmware doesn't currently read or log it. Upload failures shown here are invented to illustrate what "silent data loss" would look like given <code>base_station.ino</code> never checks its own HTTP response.</li>
-      <li><b>The Calibration Wizard generates simulated bench readings</b>, not data pulled from any field node — matching how the real protocol works (a soil sample on a bench, per CALIBRATION.md), but "Complete calibration" here writes to this session's in-memory state only. It does not persist to CALIBRATION_DATA.md.</li>
-      <li><b>Battery health has no real sensor today.</b> Neither Base_code nor Sensor_code ever reads a voltage divider, and HARDWARE.md notes panel wattage/battery capacity aren't finalized yet. The battery %, the day/night charge cycle, and the brownout-causes-offline behavior here are fully simulated — modeled to plan what a future firmware battery check might look like, and to mirror the real brownout symptoms HARDWARE.md's bring-up notes already describe ("Resets or LED dies during send" → power brownout).</li>
-      <li><b>"Offline" detection is dashboard-side inference</b> (time since last packet exceeds a threshold), not a heartbeat the firmware sends — realistic, since it's exactly how the eventual cloud dashboard would derive it from upload timestamps, but the specific threshold/logic is this demo's own design, not documented anywhere in the repo.</li>
-      <li><b>Flood Prediction is entirely dashboard-side and has no firmware counterpart.</b> <code>Base_code</code> does not forecast anything — it compares each reading to a fixed threshold and fires. The projection here is an ordinary least-squares fit over the last 24 readings of each raw series, extrapolated linearly to that series' own threshold; the sooner of soil and water is reported. Linear extrapolation assumes the current rate holds, which it will not across an infiltration curve or once a field starts ponding, so treat the ETA as "if nothing changes" rather than a forecast. The r² shown is the fit quality of that straight line, not a probability that the field floods.</li>
-      <li><b>Rain figures beside the projection are live but are not an input to it.</b> Open-Meteo is regional, not per-field, and the projection is trend-only — it cannot see forecast rain coming. They are shown side by side precisely so a disagreement is visible: ground wetting with no rain forecast usually means irrigation, drainage or a failing probe rather than weather.</li>
-      <li><b>Scenario data is invented.</b> The per-node "spike", "flood" and "drift" behaviours driving these trends are hand-written to exercise the UI. They are shaped to look like the soil ranges in CALIBRATION_DATA.md (dry ≈875, saturated ≈385) but are not replayed from any real logged field event.</li>
-      <li><b>The "Run Fleet Diagnostic" report</b> is generated client-side from current simulated readings — it's a UI feature of this console, not a firmware or cloud capability that exists today.</li>
-      <li><b>RX/cloud console lines</b> match the real packet format and query string exactly, but <code>base_station.ino</code> doesn't currently print received packets to Serial — only <code>sensor_node.ino</code> prints "Transmitted:"/"Bounced:" lines.</li>
-    </ul>
+  <div class="section-title"><h2>Provenance</h2></div>
+  <div class="panel prov">
+    <div class="prov-col">
+      <h5 class="ok">Measured</h5>
+      <ul>
+        <li>Dry soil 875.0 <span class="pv">SD 23.0, n=5</span></li>
+        <li>Flooded soil 385.4 <span class="pv">SD 25.1, n=5</span></li>
+        <li>Soil bands = mean ±2SD</li>
+      </ul>
+      <p>31 Aug 2026, round 1 of 3. One soil type, one node.</p>
+    </div>
+    <div class="prov-col">
+      <h5 class="est-h">Estimated</h5>
+      <ul>
+        <li>Healthy band 552–699 <span class="pv">clay-loam literature</span></li>
+        <li>Buffers: water 30, rain 980</li>
+        <li>Idle readings <span class="pv">observed, not logged</span></li>
+      </ul>
+      <p>Never present these as test results.</p>
+    </div>
+    <div class="prov-col">
+      <h5 class="warn-h">Not yet tested</h5>
+      <ul>
+        <li>Soil field capacity</li>
+        <li>Fast-drop rate <span class="pv">needs a real wetting event</span></li>
+        <li>Rain intensity, water depth</li>
+      </ul>
+      <p>Rain and water are on/off only. Fast-drop is excluded from the warning level until calibrated.</p>
+    </div>
+    <div class="prov-col">
+      <h5 class="sim-h">Simulated here</h5>
+      <ul>
+        <li>All node readings and scenarios</li>
+        <li>Battery, brownout, offline state</li>
+        <li>Rain gauge <span class="pv">no hardware exists</span></li>
+        <li>Cell signal, upload failures</li>
+      </ul>
+      <p>Flood prediction is dashboard-side. Base_code compares to a threshold and fires; it does not forecast.</p>
+    </div>
   </div>
 
   <footer>
@@ -565,47 +608,78 @@ function effectiveTheme(){ return document.documentElement.getAttribute("data-th
 /* =========================================================================
    CONFIG — copied from Base_code / Sensor_code / CALIBRATION.md
    ========================================================================= */
-const SOIL_ALERT_THRESHOLD = 450;
-const SOIL_RESET_THRESHOLD = 500;   // placeholder, see Known Simplifications
-const WATER_ALERT_THRESHOLD = 200;  // direction unverified
-const SOIL_WILTING_POINT = 800;
-const SOIL_OPTIMAL_POINT = 400;
-const SUSTAIN_COUNT = 3;
-const RAPID_RISE_PCT_PER_MIN = 4; // matches the RATE_ALERT_PCT_PER_MIN concept in moisture_alert_logic.ino
+/* All values are 10-bit ADC counts (0–1023) as read on the transmitter node.
+   The three probes do not share a direction: water reads UP when wet, soil
+   and rain read DOWN when wet. Sensor Findings Brief, 2026-09-17. */
+
+// --- Measured: 5 readings per condition, 31 Aug 2026 (round 1 of 3) -------
+const SOIL_DRY_MEAN = 875.0, SOIL_DRY_SD = 23.0;    // min 837, max 895
+const SOIL_SAT_MEAN = 385.4, SOIL_SAT_SD = 25.1;    // min 361, max 418
+
+// --- Trigger thresholds: padded past the bench numbers for sensor noise ---
+const SOIL_FLOOD_THRESHOLD = 436;   // saturated  (SAT mean + 2SD)
+const SOIL_WATCH_THRESHOLD = 551;   // wetter than ideal, upper bound
+const SOIL_CLEAR_THRESHOLD = 470;   // hysteresis, so alerts don't flip
+const WATER_FLOOD_THRESHOLD = 30;   // ~3% of scale; idle reads 0
+const RAIN_THRESHOLD = 980;         // ~4% buffer; idle reads ~1023
+const SUSTAIN_COUNT = 3;            // consecutive readings before committing
 const RESET_COUNT = 3;
+
+// --- Soil zone edges. Only the two ends are measured; see SOIL_ZONES. -----
+const SOIL_FAULT_FLOOR = 960;       // at/above this the probe is out of soil
+const SOIL_CRIT_DRY_FLOOR = 829;
+const SOIL_DRYING_FLOOR = 700;
+const SOIL_HEALTHY_FLOOR = 552;     // ESTIMATED — clay-loam literature
+const SOIL_HEALTHY_CEIL = 699;      // ESTIMATED — clay-loam literature
+
+// The brief calls a fast soil drop the strongest early flood signal but does
+// not set the rate — it needs a real wetting event logged first. This drives
+// a UI flag only; it is deliberately NOT an input to the warning level until
+// RAPID_DROP_CALIBRATED is true.
+const RAPID_DROP_PCT_PER_MIN = 4;
+const RAPID_DROP_CALIBRATED = false;
+
 const READ_INTERVAL_MS = 10000;
-const CAL_DRY = 875.0;
-const CAL_SAT = 385.4;
-let CAL_FC = null; // set once the Field-Capacity wizard below completes
 const SMS_COOLDOWN_SIM_MS = 3600000;
 let lastSmsSimTime = 0;
+let CAL_FC = null;                  // set by the Field-Capacity wizard
 
-// Rain gauge — entirely speculative, no real hardware/calibration exists.
-const RAIN_ALERT_THRESHOLD = 400; // placeholder
-const RAIN_DRY = 900;             // placeholder "no rain" reference
-const RAIN_SAT = 300;             // placeholder "heavy rain" reference
+// Soil bands, wettest first. `est` marks a boundary that came from typical
+// clay-loam data rather than our own bench tests — the brief is explicit
+// that estimated values must never be shown as measured results.
+const SOIL_ZONES = [
+  {max:SOIL_FLOOD_THRESHOLD,   key:"saturated", short:"Saturated",  label:"Saturated",          health:"Roots flooding",     flood:"Flood risk", cls:"bad",  est:false},
+  {max:SOIL_WATCH_THRESHOLD,   key:"wet",       short:"Too wet",    label:"Wetter than ideal",  health:"Waterlogging risk",  flood:"Watch",      cls:"warn", est:true},
+  {max:SOIL_HEALTHY_CEIL,      key:"healthy",   short:"Healthy",    label:"Healthy",            health:"Good for crops",     flood:"No risk",    cls:"good", est:true},
+  {max:SOIL_DRYING_FLOOR+128,  key:"drying",    short:"Drying",     label:"Drying out",         health:"Needs water soon",   flood:"No risk",    cls:"warn", est:false},
+  {max:SOIL_FAULT_FLOOR-1,     key:"crit_dry",  short:"Very dry",   label:"Critically dry",     health:"Drought stress",     flood:"No risk",    cls:"bad",  est:false},
+  {max:Infinity,               key:"fault",     short:"Fault",      label:"Probe out of soil",  health:"Sensor fault",       flood:"Ignore",     cls:"bad",  est:false}
+];
+function soilZone(raw){ return SOIL_ZONES.find(z => raw <= z.max); }
 
+/* Normalisation from the brief — every feature reads 0 = dry, 1 = wet,
+   which is what lets three probes of differing polarity be compared. */
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const waterWet = raw => clamp01(raw/1023);
+const soilWet  = raw => clamp01((SOIL_DRY_MEAN - raw)/(SOIL_DRY_MEAN - SOIL_SAT_MEAN));
+const rainWet  = raw => clamp01((1023 - raw)/1023);
+
+// Kept as a 0–100 display figure: 100 = saturated end of the measured range.
 function calculateSoilHealth(soil){
-  if (soil >= SOIL_WILTING_POINT) return 0;
-  if (soil <= SOIL_ALERT_THRESHOLD) return 20;
-  let score = (soil - SOIL_WILTING_POINT) * 100 / (SOIL_OPTIMAL_POINT - SOIL_WILTING_POINT);
-  return Math.max(0, Math.min(100, Math.round(score)));
+  return Math.round(soilWet(soil)*100);
 }
 function provisionalWetnessPct(soil){
-  // CALIBRATION.md's actual intended scale is Field-Capacity(0%) to
-  // Saturated(100%) — DRY-to-SATURATED is only the provisional fallback
-  // while Field Capacity is missing. Once the wizard below completes,
-  // this switches to the real intended calculation automatically.
+  // The brief's scale is DRY(0) → SATURATED(100). Field capacity would give
+  // the agronomically correct zero point, but that test isn't done yet.
   if (CAL_FC !== null){
-    const pct = (CAL_FC - soil) / (CAL_FC - CAL_SAT) * 100;
-    return Math.max(0, Math.min(100, pct));
+    return Math.max(0, Math.min(100, (CAL_FC - soil)/(CAL_FC - SOIL_SAT_MEAN)*100));
   }
-  let pct = (CAL_DRY - soil) / (CAL_DRY - CAL_SAT) * 100;
-  return Math.max(0, Math.min(100, pct));
+  return soilWet(soil)*100;
 }
 function rainIntensityPct(raw){
-  let pct = (RAIN_DRY - raw) / (RAIN_DRY - RAIN_SAT) * 100;
-  return Math.max(0, Math.min(100, pct));
+  // On/off only. The brief does not have light-vs-heavy calibration, so this
+  // is a display scale, not a measured intensity.
+  return Math.round(rainWet(raw)*100);
 }
 function riskScore(wetnessPct, water){
   const waterPct = Math.max(0, Math.min(100, water/300*100));
@@ -619,15 +693,15 @@ const BASE_LOC = {lat:14.5333, lon:121.0000, name:"Base Station"};
 
 const nodes = [
   { id:"1", name:"North Rice Paddy", type:"field", loc:{lat:14.5361, lon:120.9995},
-    soil:620, water:90, direct:true, scenario:"spike", scenarioTick:0,
+    soil:660, water:0, direct:true, scenario:"spike", scenarioTick:0,
     history:[], state:"NORMAL", overCount:0, underCount:0, packets:0, lastSeen:Date.now(), smsCount:0,
     battery:92, failed:false, failReason:null },
   { id:"2", name:"East Canal Field", type:"field", loc:{lat:14.5352, lon:121.0044},
-    soil:640, water:110, direct:true, scenario:"flood", scenarioTick:0,
+    soil:780, water:0, direct:true, scenario:"flood", scenarioTick:0,
     history:[], state:"NORMAL", overCount:0, underCount:0, packets:0, lastSeen:Date.now(), smsCount:0,
     battery:78, failed:false, failReason:null },
   { id:"3", name:"Riverside Plot", type:"field", loc:{lat:14.5288, lon:120.9978},
-    soil:600, water:95, direct:false, relayVia:"2", scenario:"drift", scenarioTick:0,
+    soil:690, water:0, direct:false, relayVia:"2", scenario:"drift", scenarioTick:0,
     history:[], state:"NORMAL", overCount:0, underCount:0, packets:0, lastSeen:Date.now(), smsCount:0,
     battery:55, failed:false, failReason:null }
 ];
@@ -679,7 +753,7 @@ function toggleNodeFailure(id){
 
 const rainNode = {
   id:"R", name:"Central Rain Gauge", type:"rain", planned:true, loc:{lat:14.5333, lon:121.0010},
-  raw:850, scenario:"storm", scenarioTick:0,
+  raw:1015, scenario:"storm", scenarioTick:0,
   history:[], state:"NORMAL", overCount:0, underCount:0, packets:0, lastSeen:Date.now()
 };
 
@@ -718,37 +792,61 @@ let lastTickWall = performance.now();
 
 function noise(range){ return (Math.random()*2-1)*range; }
 
+/* Scenario ranges follow the Findings Brief's measured envelope:
+     soil   ~875 dry soil, ~385 flooded, >=960 means probe out of ground
+     water  idles at 0 and only leaves 0 on real contact
+     rain   idles ~1023 and falls when wet
+   The shapes are still invented — no real wetting event has been logged —
+   but the values a node can produce are now the ones the probes actually
+   produce, so thresholds mean the same thing here as on the bench. */
+const SOIL_FLOOR = Math.round(SOIL_SAT_MEAN - 2*SOIL_SAT_SD);   // 335
+const SOIL_CEIL  = 1023;
+
 function applyScenario(node){
   node.scenarioTick = (node.scenarioTick||0) + 1;
   const t = node.scenarioTick;
+  const settle = (cur, target, k, n) => cur + (target-cur)*k + noise(n);
+
   if (node.scenario === "flood"){
-    if (t < 6){ node.soil += noise(8); node.water += noise(6); }
-    else if (t < 22){ node.soil -= (6+noise(4)); node.water += (9+noise(5)); }
-    else if (t < 34){ node.soil += noise(6); node.water += noise(8); }
-    else if (t < 55){ node.soil += (5+noise(4)); node.water -= (6+noise(4)); }
-    else { node.soil += noise(9); node.water += noise(7); if (t>70) node.scenarioTick = 0; }
-    node.soil = Math.max(360, Math.min(900, Math.round(node.soil)));
-    node.water = Math.max(20, Math.min(420, Math.round(node.water)));
+    // Full cascade: dry → rain wets the soil → soil saturates → standing
+    // water reaches the probe → drains back out.
+    let soilTarget, waterTarget;
+    if (t < 8)       { soilTarget = 780; waterTarget = 0; }
+    else if (t < 20) { soilTarget = 560; waterTarget = 0; }
+    else if (t < 30) { soilTarget = 420; waterTarget = 0; }
+    else if (t < 42) { soilTarget = 390; waterTarget = 180; }
+    else if (t < 58) { soilTarget = 470; waterTarget = 60; }
+    else             { soilTarget = 700; waterTarget = 0; if (t > 72) node.scenarioTick = 0; }
+    node.soil  = settle(node.soil,  soilTarget,  0.22, 7);
+    node.water = settle(node.water, waterTarget, 0.30, waterTarget > 0 ? 6 : 2);
   } else if (node.scenario === "spike"){
+    // Short sharp downpour: soil dives, water touches, then it clears.
     const c = t % 60;
-    const target = c < 3 ? {soil:380, water:270} : c < 8 ? {soil:390, water:250} : {soil:620, water:90};
-    node.soil += (target.soil-node.soil)*0.35 + noise(6);
-    node.water += (target.water-node.water)*0.35 + noise(5);
-    node.soil = Math.max(360, Math.min(900, Math.round(node.soil)));
-    node.water = Math.max(20, Math.min(420, Math.round(node.water)));
+    const soilTarget  = c < 4 ? 400 : c < 10 ? 430 : 660;
+    const waterTarget = c < 4 ? 120 : c < 10 ? 45  : 0;
+    node.soil  = settle(node.soil,  soilTarget,  0.35, 7);
+    node.water = settle(node.water, waterTarget, 0.38, waterTarget > 0 ? 5 : 2);
   } else if (node.scenario === "drift"){
+    // Slow waterlogging that hovers in the watch band without confirming.
     const c = t % 55;
-    const target = c < 20 ? {soil:440, water:210} : {soil:600, water:95};
-    node.soil += (target.soil-node.soil)*0.15 + noise(6);
-    node.water += (target.water-node.water)*0.15 + noise(5);
-    node.soil = Math.max(360, Math.min(900, Math.round(node.soil)));
-    node.water = Math.max(20, Math.min(420, Math.round(node.water)));
-  } else if (node.scenario === "storm"){
-    // independent rain cycle — heavy burst, hold, clear, quiet baseline
+    const soilTarget  = c < 24 ? 500 : 690;
+    const waterTarget = c < 24 ? 18  : 0;
+    node.soil  = settle(node.soil,  soilTarget,  0.14, 7);
+    node.water = settle(node.water, waterTarget, 0.16, 3);
+  }
+
+  if (node.scenario !== "storm"){
+    node.soil  = Math.max(SOIL_FLOOR, Math.min(SOIL_CEIL, Math.round(node.soil)));
+    // Water rests at exactly 0 when dry — the probe reads 0, not a floor value.
+    node.water = Math.max(0, Math.min(400, Math.round(node.water)));
+    if (node.water < 4) node.water = 0;
+  } else {
+    // Rain plate: idles ~1023, drops when wet, and stays wet a while after
+    // the rain stops (the brief notes this lag explicitly).
     const c = t % 70;
-    const target = c < 10 ? 330 : c < 20 ? 360 : c < 30 ? 600 : 850;
-    node.raw += (target - node.raw) * 0.25 + noise(10);
-    node.raw = Math.max(200, Math.min(950, Math.round(node.raw)));
+    const target = c < 12 ? 700 : c < 24 ? 820 : c < 38 ? 950 : 1015;
+    node.raw = settle(node.raw, target, 0.22, 8);
+    node.raw = Math.max(640, Math.min(1023, Math.round(node.raw)));
   }
 }
 
@@ -769,9 +867,21 @@ function stepFieldNode(node, silent){
   const health = calculateSoilHealth(node.soil);
   const pct = provisionalWetnessPct(node.soil);
   const risk = riskScore(pct, node.water);
-  const prev = node.history[node.history.length-1];
-  const dtMin = READ_INTERVAL_MS/60000;
-  const rate = prev ? (pct - prev.pct)/dtMin : 0;
+  // The brief measures ~5% wobble between consecutive soil readings and says
+  // to average 10-15 before using one. Differencing raw readings turns that
+  // wobble into tens of %/min of phantom rate, so rate is computed between
+  // two smoothed points instead.
+  const SMOOTH_N = 10;
+  const recent = node.history.slice(-SMOOTH_N);
+  const smoothNow = recent.length
+    ? (recent.reduce((s,h)=>s+h.pct, 0) + pct) / (recent.length + 1)
+    : pct;
+  const prevWindow = node.history.slice(-(SMOOTH_N*2), -SMOOTH_N);
+  const smoothPrev = prevWindow.length
+    ? prevWindow.reduce((s,h)=>s+h.pct, 0) / prevWindow.length
+    : null;
+  const dtMin = (READ_INTERVAL_MS/60000) * SMOOTH_N;
+  const rate = smoothPrev === null ? 0 : (smoothNow - smoothPrev)/dtMin;
 
   node.history.push({t: simClock, soil: node.soil, water: node.water, health, pct, risk, rate, battery: node.battery});
   predictDirty = true;
@@ -782,12 +892,17 @@ function stepFieldNode(node, silent){
   // Rate-of-rise flag — separate signal from the debounced alert state,
   // matching moisture_alert_logic.ino's RATE_ALERT_PCT_PER_MIN concept:
   // a fast-onset event can matter even before absolute saturation is hit.
-  const nowRapid = Math.abs(rate) >= RAPID_RISE_PCT_PER_MIN;
-  if (!silent && nowRapid && !node.rapidFlagged){
+  // A fast soil drop is the brief's strongest early flood signal, but the
+  // rate that counts as "fast" has not been measured yet — it needs a real
+  // wetting event logged first. So the flag is tracked for display only and
+  // never raises an event; logging on an uncalibrated threshold is precisely
+  // the false-alert problem the padded triggers exist to avoid.
+  node.rapidFlagged = Math.abs(rate) >= RAPID_DROP_PCT_PER_MIN;
+  if (!silent && RAPID_DROP_CALIBRATED && node.rapidFlagged && !node.rapidLogged){
     logLine(`RATE Node ${node.id} rapid ${rate>0?"rise":"fall"}: ${rate.toFixed(1)}%/min`, "state");
-    pushEvent("rapid", node.name, `${rate>0?"Rising":"Falling"} at ${Math.abs(rate).toFixed(1)}%/min — flash-flood-style onset, independent of the debounced alert state`);
+    pushEvent("rapid", node.name, `${rate>0?"Rising":"Falling"} at ${Math.abs(rate).toFixed(1)}%/min`);
   }
-  node.rapidFlagged = nowRapid;
+  node.rapidLogged = node.rapidFlagged;
 
   evaluateAlertState(node, silent);
   if (!silent){ logPacket(node); logCloud(node, health); }
@@ -802,16 +917,67 @@ function stepRainNode(silent){
   rainNode.lastSeen = Date.now();
 
   const prevState = rainNode.state;
-  rainNode.state = rainNode.raw < RAIN_ALERT_THRESHOLD ? "WATCHING" : "NORMAL";
+  rainNode.state = rainNode.raw < RAIN_THRESHOLD ? "WATCHING" : "NORMAL";
   if (!silent && prevState !== rainNode.state){
     logLine(`RAIN Central Rain Gauge state ${prevState} → ${rainNode.state} (placeholder threshold)`, "rain");
     pushEvent("state", "Rain Gauge", `${prevState} → ${rainNode.state}`);
   }
 }
 
+/* Four-level model, straight from the Findings Brief:
+
+     L0 Normal   rain >=980,  soil >=552,     water <=30
+     L1 Watch    rain <980 OR soil 437..551,  water <=30
+     L2 Warning  rain <980 AND (soil <=436 or dropping fast), water <=30
+     L3 Flood    water >30  — confirmed, regardless of the other two
+
+   The cascade behind it is rain -> soil falls -> standing water, so L2 is
+   the level that buys warning time; L3 is confirmation after the fact.
+   Fault handling is the brief's too: a soil reading at/above 960 means the
+   probe is out of the ground, so it is dropped from the decision rather
+   than read as "very dry". */
+function assessLevel(node){
+  const soilFault = node.soil >= SOIL_FAULT_FLOOR;
+  const raining = rainNode.raw < RAIN_THRESHOLD;
+  const waterContact = node.water > WATER_FLOOD_THRESHOLD;
+  const soilSaturated = !soilFault && node.soil <= SOIL_FLOOD_THRESHOLD;
+  const soilWet = !soilFault && node.soil <= SOIL_WATCH_THRESHOLD;
+  const droppingFast = !soilFault && node.rapidFlagged && RAPID_DROP_CALIBRATED;
+
+  if (waterContact){
+    // Water with no supporting rain or soil signal is the brief's
+    // splash/fault case — still flag it, but say why it looks odd.
+    const unsupported = !raining && !soilWet;
+    return {level:3, key:"FLOOD", reason:"Water probe above 30 — flood confirmed at the node", unsupported, soilFault};
+  }
+  if (raining && (soilSaturated || droppingFast)){
+    return {level:2, key:"WARNING", reason: soilSaturated
+      ? "Raining and soil saturated — early flood warning"
+      : "Raining and soil dropping fast — early flood warning", soilFault};
+  }
+  if (raining || soilWet){
+    return {level:1, key:"WATCH", reason: raining
+      ? (soilWet ? "Raining, and soil wetter than ideal" : "Raining")
+      : "Soil wetter than ideal", soilFault};
+  }
+  return {level:0, key:"NORMAL", reason: soilFault ? "Soil probe out of ground — judging on rain and water only" : "All three probes normal", soilFault};
+}
+
+const LEVEL_STATE = {0:"NORMAL", 1:"WATCHING", 2:"WATCHING", 3:"ALERTED"};
+
 function evaluateAlertState(node, silent){
-  const triggered = node.soil < SOIL_ALERT_THRESHOLD || node.water > WATER_ALERT_THRESHOLD;
-  const cleared = node.soil > SOIL_RESET_THRESHOLD && node.water <= WATER_ALERT_THRESHOLD;
+  const a = assessLevel(node);
+  node.level = a.level;
+  node.levelReason = a.reason;
+  node.unsupportedWater = !!a.unsupported;
+  node.soilFault = !!a.soilFault;
+
+  // Commit an alert only after SUSTAIN_COUNT consecutive readings (the
+  // brief asks for 3 in a row on both water and rain), and clear through
+  // the hysteresis band so the state can't chatter.
+  const triggered = a.level >= 2;
+  const cleared = a.level === 0 ||
+    (node.soil > SOIL_CLEAR_THRESHOLD && node.water <= WATER_FLOOD_THRESHOLD && a.level <= 1);
   const prevState = node.state;
 
   if (node.state === "NORMAL"){
@@ -959,33 +1125,32 @@ function renderFleetStats(){
   const cooldownMin = cooldownActive ? Math.max(1, Math.ceil((SMS_COOLDOWN_SIM_MS - (simClock - lastSmsSimTime))/60000)) : 0;
 
   const tiles = [
-    {label:"Field Nodes", value:`${online}/${nodes.length}`, sub:"online now", cls: offlineNodes.length?"bad":"good"},
-    {label:"Nodes Offline", value:offlineNodes.length, sub: offlineNodes.length?offlineNodes.map(n=>n.name).join(", "):"none", cls: offlineNodes.length?"bad":"good"},
-    {label:"Active Alerts", value:alerted, sub: alerted?"needs attention":"none", cls: alerted?"bad":"good"},
-    {label:"Watching", value:watching, sub:"pre-alert state", cls: watching?"warn":""},
-    {label:"Total Packets", value:totalPackets, sub:"this session"},
-    {label:"SMS Sent", value:totalSms, sub:"this session"},
-    {label:"SMS Suppressed", value:suppressedCount, sub:"by global cooldown", cls: suppressedCount?"warn":""},
-    {label:"State Changes", value:stateChangeCount, sub:"NORMAL/WATCH/ALERT"},
-    {label:"Avg Battery", value:avgBattery+"%", sub: lowBatteryCount ? `${lowBatteryCount} node(s) low` : "all nominal (speculative)", cls: lowBatteryCount?"warn":"good"},
-    {label:"Avg Soil (raw)", value:avgSoil, sub:"across field nodes"},
-    {label:"Avg Water (raw)", value:avgWater, sub:"across field nodes"},
-    {label:"Avg Health Index", value:avgHealth+"/100", sub:"across field nodes"},
-    {label:"Avg Flood Risk", value:avgRisk+"/100", sub:"composite, display-only"},
-    {label:"SMS Cooldown", value: cooldownActive?`${cooldownMin}m left`:"Clear", sub:"global, shared across nodes", cls: cooldownActive?"warn":"good"},
+    {label:"Field Nodes", value:`${online}/${nodes.length}`, cls: offlineNodes.length?"bad":"good"},
+    {label:"Nodes Offline", value:offlineNodes.length, cls: offlineNodes.length?"bad":"good"},
+    {label:"Active Alerts", value:alerted, cls: alerted?"bad":"good"},
+    {label:"Watching", value:watching, cls: watching?"warn":""},
+    {label:"Total Packets", value:totalPackets},
+    {label:"SMS Sent", value:totalSms},
+    {label:"SMS Suppressed", value:suppressedCount, cls: suppressedCount?"warn":""},
+    {label:"State Changes", value:stateChangeCount},
+    {label:"Avg Battery", value:avgBattery+"%", cls: lowBatteryCount?"warn":"good"},
+    {label:"Avg Soil (raw)", value:avgSoil},
+    {label:"Avg Water (raw)", value:avgWater},
+    {label:"Avg Health Index", value:avgHealth+"/100"},
+    {label:"Avg Flood Risk", value:avgRisk+"/100"},
+    {label:"SMS Cooldown", value: cooldownActive?`${cooldownMin}m left`:"Clear", cls: cooldownActive?"warn":"good"},
   ];
 
   const csq = csqInfo(cellularCSQ);
   const completeness = cloudUploadAttempts ? (cloudUploadSuccesses/cloudUploadAttempts*100) : 100;
   tiles.push(
-    {label:"Cellular Signal (CSQ)", value:`${cellularCSQ.toFixed(0)}/31`, sub:csq.label+" — base station only", cls:csq.cls},
-    {label:"Cloud Data Completeness", value:completeness.toFixed(0)+"%", sub:`${cloudUploadSuccesses}/${cloudUploadAttempts} uploads landed`, cls: completeness<80?"bad":completeness<95?"warn":"good"}
+    {label:"Cellular Signal (CSQ)", value:`${cellularCSQ.toFixed(0)}/31`, cls:csq.cls},
+    {label:"Cloud Data Completeness", value:completeness.toFixed(0)+"%", cls: completeness<80?"bad":completeness<95?"warn":"good"}
   );
   document.getElementById("fleet-stats").innerHTML = tiles.map(t=>`
     <div class="stat-tile ${t.cls||''}">
       <div class="st-label">${t.label}</div>
       <div class="st-value">${t.value}</div>
-      <div class="st-sub">${t.sub}</div>
     </div>`).join("");
 }
 
@@ -1011,7 +1176,7 @@ function renderNodesTable(){
       <td class="n">${n.name}</td>
       <td>Field sensor</td>
       <td>${n.direct ? "Direct" : `Via Node ${n.relayVia}`}</td>
-      <td><span class="row-badge ${meta.cls}">${meta.label}</span>${n.rapidFlagged && !offline ? ' <span class="row-badge suppressed" title="Rate-of-rise flag, independent of debounced alert state">Rapid rise</span>' : ''}</td>
+      <td><span class="row-badge ${meta.cls}">${meta.label}</span>${n.rapidFlagged && !offline ? ' <span class="row-badge suppressed" title="Soil moving fast. Rate threshold not yet calibrated, so this is an observation only.">Fast &Delta;</span>' : ''}</td>
       <td>${batteryCellHtml(n)}</td>
       <td class="n">${n.soil}</td>
       <td class="n">${n.water}</td>
@@ -1099,15 +1264,15 @@ function makeChart(id, extraYOpts){
     options: baseOpts(extraYOpts)
   });
 }
-const chartSoil = makeChart("chart-soil", {min:350,max:900});
-const chartWater = makeChart("chart-water", {min:0,max:420});
+const chartSoil = makeChart("chart-soil", {min:330,max:1023});
+const chartWater = makeChart("chart-water", {min:0,max:260});
 const chartHealth = makeChart("chart-health", {min:0,max:100});
 const chartRisk = makeChart("chart-risk", {min:0,max:100});
 const chartRate = makeChart("chart-rate", {});
 const chartRain = new Chart(document.getElementById("chart-rain"), {
   type:"line",
   data:{labels:[], datasets:[{label:"Central Rain Gauge", data:[], borderColor:rainColor, backgroundColor:"transparent"}]},
-  options: baseOpts({min:200,max:950})
+  options: baseOpts({min:850,max:1023})
 });
 const chartBattery = makeChart("chart-battery", {min:0,max:100});
 
@@ -1255,8 +1420,8 @@ function predictNode(node){
   const last = hist[hist.length-1];
 
   // Soil alerts on a FALLING raw value (wetter); water on a RISING one.
-  const soilEta  = etaToThreshold(last.soil,  SOIL_ALERT_THRESHOLD,  soilFit.slope,  false);
-  const waterEta = etaToThreshold(last.water, WATER_ALERT_THRESHOLD, waterFit.slope, true);
+  const soilEta  = etaToThreshold(last.soil,  SOIL_FLOOD_THRESHOLD,  soilFit.slope,  false);
+  const waterEta = etaToThreshold(last.water, WATER_FLOOD_THRESHOLD, waterFit.slope, true);
 
   let driver=null, eta=null;
   if (soilEta !== null && (waterEta === null || soilEta <= waterEta)){
@@ -1360,43 +1525,24 @@ function renderPrediction(){
   const fc6 = weatherCache ? forecastRain(weatherCache.data, 6) : null;
   const fc12 = weatherCache ? forecastRain(weatherCache.data, 12) : null;
 
-  // Verdict combines our own projection with the public forecast. The two
-  // disagreeing is itself the useful signal for a technician.
-  let cls, etaTxt, text;
-  const wetting = p.soilPerMin < -0.4 || p.waterPerMin > 0.4;
-  if (p.eta !== null && p.eta <= 30){ cls="urgent"; }
-  else if (p.eta !== null){ cls="watch"; }
-  else { cls="calm"; }
-  etaTxt = fmtEta(p.eta);
+  const a = assessLevel(node);
+  const zone = soilZone(p.last.soil);
+  const LEVEL_CLS = {0:"calm", 1:"watch", 2:"urgent", 3:"urgent"};
+  const LEVEL_NAME = {0:"Normal", 1:"Watch", 2:"Warning", 3:"Flood"};
+  const cls = LEVEL_CLS[a.level];
+  const etaTxt = a.level === 3 ? "now" : fmtEta(p.eta);
 
-  const driverTxt = p.driver === "soil"
-    ? `soil falling to the ${SOIL_ALERT_THRESHOLD} saturation threshold`
-    : p.driver === "water"
-      ? `water rising to the ${WATER_ALERT_THRESHOLD} threshold`
-      : null;
-
-  if (p.eta !== null){
-    text = `Projecting the last ${p.hist.length} readings forward, <b>${node.name}</b> reaches its alert threshold in about <b>${etaTxt}</b> — driven by ${driverTxt}. Confidence <b>${conf.txt}</b> (${conf.note}).`;
-    if (fc6 !== null){
-      text += fc6 >= 4
-        ? ` The regional forecast agrees: <b>${fc6}mm</b> expected in the next 6h.`
-        : ` But the forecast shows only <b>${fc6}mm</b> in the next 6h — if no rain is coming, check irrigation, drainage or the probe itself before trusting this.`;
-    }
-  } else if (wetting){
-    text = `<b>${node.name}</b> is wetting up, but not on track to cross a threshold within ${PREDICT_HORIZON_MIN} minutes at the current rate. Confidence <b>${conf.txt}</b> (${conf.note}).`;
-    if (fc6 !== null && fc6 >= 4) text += ` Worth watching — <b>${fc6}mm</b> of rain is forecast in the next 6h, which this projection does not account for.`;
-  } else {
-    // Distinguish an actively receding field from a genuinely flat one —
-    // "draining after a peak" is a different operational picture from "quiet".
-    const receding = p.soilPerMin > 0.4 || p.waterPerMin < -0.4;
-    text = receding
-      ? `<b>${node.name}</b> is draining — soil ${p.soilPerMin>0?"drying":"wetting"} at <b>${Math.abs(p.soilPerMin).toFixed(1)}</b> ADC/min, water ${p.waterPerMin<0?"falling":"rising"} at <b>${Math.abs(p.waterPerMin).toFixed(1)}</b> ADC/min. No threshold crossing projected. Confidence <b>${conf.txt}</b> (${conf.note}).`
-      : `<b>${node.name}</b> is steady — neither series is trending toward a threshold. Confidence <b>${conf.txt}</b> (${conf.note}).`;
-    if (fc6 !== null && fc6 >= 8){
-      cls = "watch";
-      text += ` Note the forecast: <b>${fc6}mm</b> in the next 6h with the ground currently steady — this projection is trend-only and cannot see that rain coming.`;
-    }
+  // The level is the brief's rule set; the ETA is our projection. Keep them
+  // visibly separate — one is a spec, the other is an extrapolation.
+  let text = `<b>L${a.level} ${LEVEL_NAME[a.level]}</b> — ${a.reason}.`;
+  if (a.level < 3 && p.eta !== null){
+    text += ` Trend reaches ${p.driver === "soil" ? `soil ${SOIL_FLOOD_THRESHOLD}` : `water ${WATER_FLOOD_THRESHOLD}`} in ~${etaTxt}, confidence ${conf.txt} (${conf.note}).`;
+  } else if (a.level < 3){
+    text += ` No threshold crossing projected within ${PREDICT_HORIZON_MIN} min.`;
   }
+  if (a.unsupported) text += ` Rain and soil both read dry — check the node for splash or a fault.`;
+  if (a.soilFault) text += ` Soil probe reads ≥${SOIL_FAULT_FLOOR}; excluded from the decision.`;
+  if (fc6 !== null && a.level < 2 && fc6 >= 8) text += ` Forecast ${fc6}mm/6h not seen by the trend.`;
 
   body.innerHTML = `
     <div class="verdict ${cls}">
@@ -1404,18 +1550,19 @@ function renderPrediction(){
       <div class="v-text">${text}</div>
     </div>
     <div class="predict-metrics">
-      <div class="pm"><div class="k">Soil now</div><div class="v">${p.last.soil}</div><div class="s">${p.soilPerMin>=0?"+":""}${p.soilPerMin.toFixed(1)} ADC/min</div></div>
-      <div class="pm"><div class="k">Water now</div><div class="v">${p.last.water}</div><div class="s">${p.waterPerMin>=0?"+":""}${p.waterPerMin.toFixed(1)} ADC/min</div></div>
-      <div class="pm"><div class="k">Soil ETA</div><div class="v">${fmtEta(p.soilEta)}</div><div class="s">to ${SOIL_ALERT_THRESHOLD}</div></div>
-      <div class="pm"><div class="k">Water ETA</div><div class="v">${fmtEta(p.waterEta)}</div><div class="s">to ${WATER_ALERT_THRESHOLD}</div></div>
-      <div class="pm"><div class="k">Health</div><div class="v">${p.last.health}</div><div class="s">0–100 index</div></div>
-      <div class="pm"><div class="k">Forecast 6h / 12h</div><div class="v">${fc6===null?"—":fc6+"mm"}</div><div class="s">${fc12===null?"awaiting weather":fc12+"mm over 12h"}</div></div>
+      <div class="pm"><div class="k">Soil</div><div class="v">${p.last.soil}</div><div class="s">${p.soilPerMin>=0?"+":""}${p.soilPerMin.toFixed(1)}/min</div></div>
+      <div class="pm"><div class="k">Water</div><div class="v">${p.last.water}</div><div class="s">${p.waterPerMin>=0?"+":""}${p.waterPerMin.toFixed(1)}/min</div></div>
+      <div class="pm"><div class="k">Rain</div><div class="v">${rainNode.raw}</div><div class="s">${rainNode.raw < RAIN_THRESHOLD ? "raining" : "dry"}</div></div>
+      <div class="pm"><div class="k">Soil ETA</div><div class="v">${fmtEta(p.soilEta)}</div></div>
+      <div class="pm"><div class="k">Water ETA</div><div class="v">${fmtEta(p.waterEta)}</div></div>
+      <div class="pm"><div class="k">Zone</div><div class="v" style="font-size:10.5px;">${zone.short}${zone.est?' <span class="est">est</span>':''}</div></div>
+      <div class="pm"><div class="k">Forecast</div><div class="v">${fc6===null?"—":fc6+"mm"}</div><div class="s">6h${fc12===null?"":` · ${fc12}mm 12h`}</div></div>
     </div>
-    <div class="predict-chart-box"><canvas id="predict-chart"></canvas></div>
-    <div class="predict-note">
-      <b>How this is computed:</b> least-squares fit over the last ${p.hist.length} readings of each raw series, extrapolated to its own threshold; the sooner of the two is shown. Rain figures come live from Open-Meteo and are <i>not</i> an input to the projection — they are shown beside it so you can see when the two disagree.
-      <b>No part of this runs on the node.</b> Base_code compares each reading to a threshold and fires; it does not forecast.
-    </div>`;
+    <div class="cascade">${["Rain &lt;980","Soil &lt;552","Soil ≤436","Water &gt;30"].map((step,i)=>{
+      const reached = [rainNode.raw<RAIN_THRESHOLD, p.last.soil<SOIL_HEALTHY_FLOOR, p.last.soil<=SOIL_FLOOD_THRESHOLD, p.last.water>WATER_FLOOD_THRESHOLD][i];
+      return `<span class="cs ${reached?'on':''}">${step}</span>`;
+    }).join('<span class="cs-arrow">→</span>')}</div>
+    <div class="predict-chart-box"><canvas id="predict-chart"></canvas></div>`;
 
   drawPredictChart(p);
 }
@@ -1426,7 +1573,7 @@ function drawPredictChart(p){
   const useSoil = p.driver !== "water";
   const series = useSoil ? p.hist.map(h=>h.soil) : p.hist.map(h=>h.water);
   const fit = useSoil ? p.soilFit : p.waterFit;
-  const threshold = useSoil ? SOIL_ALERT_THRESHOLD : WATER_ALERT_THRESHOLD;
+  const threshold = useSoil ? SOIL_FLOOD_THRESHOLD : WATER_FLOOD_THRESHOLD;
   const t0 = p.hist[0].t;
 
   // Project forward to the ETA, or 45 simulated minutes if there is none.
@@ -1484,18 +1631,16 @@ function buildNodeDetailCards(){
         </div>
         <div class="nd-health" id="nd-health-${n.id}">
           <div class="h-val">—</div>
-          <div class="h-lab">Soil health</div>
+          <div class="h-lab" id="nd-zone-${n.id}">—</div>
         </div>
       </div>
       <div class="nd-bar"><div class="f" id="nd-bar-${n.id}" style="width:0%"></div></div>
       <div class="nd-charts">
         <div class="nd-chart">
-          <h5>Soil moisture</h5><div class="nd-cs">raw ADC · lower = wetter</div>
-          <div class="nd-chart-box"><canvas id="nd-soil-${n.id}"></canvas></div>
+          <h5>Soil moisture</h5>          <div class="nd-chart-box"><canvas id="nd-soil-${n.id}"></canvas></div>
         </div>
         <div class="nd-chart">
-          <h5>Water level</h5><div class="nd-cs">raw ADC · higher = more water</div>
-          <div class="nd-chart-box"><canvas id="nd-water-${n.id}"></canvas></div>
+          <h5>Water level</h5>          <div class="nd-chart-box"><canvas id="nd-water-${n.id}"></canvas></div>
         </div>
       </div>
       <div class="nd-foot">
@@ -1508,8 +1653,8 @@ function buildNodeDetailCards(){
 
   nodes.forEach(n=>{
     nodeCharts[n.id] = {
-      soil: makeMiniChart(`nd-soil-${n.id}`, nodeColors[n.id], SOIL_ALERT_THRESHOLD, {min:350,max:900}),
-      water: makeMiniChart(`nd-water-${n.id}`, nodeColors[n.id], WATER_ALERT_THRESHOLD, {min:0,max:420})
+      soil: makeMiniChart(`nd-soil-${n.id}`, nodeColors[n.id], SOIL_FLOOD_THRESHOLD, {min:330,max:1023}),
+      water: makeMiniChart(`nd-water-${n.id}`, nodeColors[n.id], WATER_FLOOD_THRESHOLD, {min:0,max:260})
     };
   });
   grid.querySelectorAll(".nd-card").forEach(c=>{
@@ -1535,18 +1680,22 @@ function makeMiniChart(id, color, threshold, yOpts){
   });
 }
 
-function healthBand(h){ return h >= 60 ? "good" : h >= 30 ? "mid" : "bad"; }
+// Band follows the soil zone table, not an arbitrary cut on the index.
+function healthBand(soilRaw){ return soilZone(soilRaw).cls === "good" ? "good" : soilZone(soilRaw).cls === "warn" ? "mid" : "bad"; }
 
 function updateNodeDetail(){
   nodes.forEach(n=>{
     const last = n.history[n.history.length-1];
     if (!last) return;
     const offline = isOffline(n);
-    const band = healthBand(last.health);
+    const band = healthBand(last.soil);
 
+    const zone = soilZone(last.soil);
     const hEl = document.getElementById(`nd-health-${n.id}`);
     hEl.className = `nd-health ${band}`;
     hEl.querySelector(".h-val").textContent = offline ? "—" : last.health;
+    document.getElementById(`nd-zone-${n.id}`).innerHTML =
+      offline ? "offline" : `${zone.label}${zone.est ? ' <span class="est">est</span>' : ''}`;
 
     const bar = document.getElementById(`nd-bar-${n.id}`);
     bar.className = `f ${band}`;
@@ -1564,11 +1713,11 @@ function updateNodeDetail(){
     const labels = n.history.map((_,i)=>i);
     c.soil.data.labels = labels;
     c.soil.data.datasets[0].data = n.history.map(h=>h.soil);
-    c.soil.data.datasets[1].data = labels.map(()=>SOIL_ALERT_THRESHOLD);
+    c.soil.data.datasets[1].data = labels.map(()=>SOIL_FLOOD_THRESHOLD);
     c.soil.update();
     c.water.data.labels = labels;
     c.water.data.datasets[0].data = n.history.map(h=>h.water);
-    c.water.data.datasets[1].data = labels.map(()=>WATER_ALERT_THRESHOLD);
+    c.water.data.datasets[1].data = labels.map(()=>WATER_FLOOD_THRESHOLD);
     c.water.update();
   });
 }
@@ -1740,7 +1889,7 @@ function runDiagnostic(){
 function renderDiagnosticHistory(){
   const el = document.getElementById("diagnostic-history");
   if (!diagnosticHistory.length){
-    el.innerHTML = '<div class="diag-empty">No diagnostic run yet — click "Run Fleet Diagnostic" above.</div>';
+    el.innerHTML = '<div class="diag-empty">No diagnostic run yet.</div>';
     return;
   }
   el.innerHTML = diagnosticHistory.map(r => `
@@ -1835,18 +1984,17 @@ function renderEconomics(){
   const fleetCost = n*NODE_COST, commercialCost = n*COMMERCIAL_COST;
   const savings = commercialCost - fleetCost;
   const tiles = [
-    {label:"Nodes Deployed", value:n, sub:"field sensors, this farm"},
-    {label:"Target Cost / Node", value:"$"+NODE_COST, sub:"HARDWARE.md ceiling, not itemized"},
-    {label:"This Fleet's Cost", value:"$"+fleetCost, sub:`${n} × $${NODE_COST}`},
-    {label:"Commercial Equivalent", value:"$"+commercialCost.toLocaleString(), sub:`${n} × $${COMMERCIAL_COST}+ (README baseline)`},
-    {label:"Estimated Savings", value:"$"+savings.toLocaleString(), sub:`~${(savings/commercialCost*100).toFixed(0)}% lower, this fleet size`, cls:"good"},
-    {label:"Per-Sensor Subscription", value:"$0/mo", sub:"one shared SIM per base station"},
+    {label:"Nodes Deployed", value:n},
+    {label:"Target Cost / Node", value:"$"+NODE_COST},
+    {label:"This Fleet's Cost", value:"$"+fleetCost},
+    {label:"Commercial Equivalent", value:"$"+commercialCost.toLocaleString()},
+    {label:"Estimated Savings", value:"$"+savings.toLocaleString(), cls:"good"},
+    {label:"Per-Sensor Subscription", value:"$0/mo"},
   ];
   document.getElementById("economics-stats").innerHTML = tiles.map(t=>`
     <div class="stat-tile ${t.cls||""}">
       <div class="st-label">${t.label}</div>
       <div class="st-value">${t.value}</div>
-      <div class="st-sub">${t.sub}</div>
     </div>`).join("");
 }
 
