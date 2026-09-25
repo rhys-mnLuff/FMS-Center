@@ -246,6 +246,14 @@
     border:1px solid var(--card-border); color:var(--muted); background:var(--bg-soft);
   }
   .cs.on{border-color:var(--red); color:var(--red); background:var(--red-bg); font-weight:600;}
+  .cs.due{border-color:var(--amber); color:var(--amber); background:var(--amber-bg);}
+  .cs b{font-weight:600;}
+  /* What each projected step rests on — never let a forecast or an untimed
+     interval read like a measurement. */
+  .cs i{font-style:normal; font-size:8.5px; text-transform:uppercase; letter-spacing:.04em; padding-left:4px; opacity:.85;}
+  .cs i.b-meas{color:var(--green);}
+  .cs i.b-fc{color:var(--water);}
+  .cs i.b-unk{color:var(--muted);}
   .cs-arrow{color:var(--muted); font-size:10px;}
 
   /* Provenance: what is measured, estimated, untested, invented. The brief is
@@ -1478,6 +1486,134 @@ function predictNode(node){
   };
 }
 
+/* =========================================================================
+   FLOOD FORECAST — the actual prediction, fusing node data with weather.
+
+   Three inputs, combined rather than displayed side by side:
+     1. the node's own smoothed soil/water velocity        (measured here)
+     2. the brief's cascade ordering
+          rain <980 -> soil <552 -> soil <=436 -> water >30
+     3. the live hourly rain forecast                      (Open-Meteo)
+
+   What the forecast contributes is PERSISTENCE, not magnitude. The brief
+   has no rain-intensity calibration and no mm-to-ADC transfer function, so
+   inventing one would be fabrication. Instead the measured wetting rate is
+   held while rain is falling or forecast, and decays once the forecast goes
+   dry -- which is the difference between "this field keeps wetting" and
+   "this shower is ending".
+
+   Each stage carries a basis so the UI never presents an assumption as a
+   measurement:
+     measured   - projected from this node's own trend
+     forecast   - depends on rain that has not fallen yet
+     unmeasured - the interval exists in the cascade but no logged event
+                  has ever timed it (saturation -> standing water)
+   ========================================================================= */
+
+// Named assumptions. Not measured; exposed so they can be replaced once a
+// real wetting event is logged.
+const FC_DRY_DECAY_TAU_MIN = 25;   // wetting rate decay once rain stops
+const FC_RAIN_WET_MM_H     = 0.2;  // hourly precip that counts as "wet"
+const FC_STEP_MIN          = READ_INTERVAL_MS/60000;
+const FC_HORIZON_MIN       = 360;
+
+// Turns the Open-Meteo hourly array into a forward wet/dry schedule.
+function rainSchedule(data){
+  if (!data?.hourly?.time) return null;
+  const times = data.hourly.time, prec = data.hourly.precipitation || [];
+  const nowIso = data.current?.time || new Date().toISOString().slice(0,13);
+  let idx = times.findIndex(t => t >= nowIso);
+  if (idx < 0) return null;
+  const hours = [];
+  for (let i=idx; i<times.length; i++) hours.push(prec[i] || 0);
+  if (!hours.length) return null;
+
+  const wetAt = min => (hours[Math.floor(min/60)] ?? 0) >= FC_RAIN_WET_MM_H;
+  const firstWet = hours.findIndex(mm => mm >= FC_RAIN_WET_MM_H);
+  let stops = null;
+  if (hours[0] >= FC_RAIN_WET_MM_H){
+    const d = hours.findIndex(mm => mm < FC_RAIN_WET_MM_H);
+    stops = d < 0 ? null : d*60;
+  }
+  return {
+    wetAt, hours,
+    startsInMin: firstWet < 0 ? null : firstWet*60,
+    stopsInMin: stops,
+    total: h => Math.round(hours.slice(0, h).reduce((a,b)=>a+b, 0)*10)/10
+  };
+}
+
+/* Forward simulation. Soil velocity is the node's own measured rate; the
+   schedule decides how long it survives. Water is only projected when it is
+   already moving -- the saturation-to-contact interval has never been timed,
+   so guessing it would be inventing the number the brief says is missing. */
+function floodForecast(node, p, data){
+  const sched = rainSchedule(data);
+  const rainingNow = rainNode.raw < RAIN_THRESHOLD;
+  let soil = p.last.soil, water = p.last.water;
+  let vSoil = p.soilPerMin;            // ADC/min, negative = wetting
+  const vWater = p.waterPerMin;
+  const wetting = vSoil < -0.2;
+
+  const path = [{t:0, soil, water}];
+  let satAt = null, contactAt = null;
+
+  for (let t=FC_STEP_MIN; t<=FC_HORIZON_MIN; t+=FC_STEP_MIN){
+    // Is the field being rained on at this point in the projection?
+    const wet = sched ? (t < 60 ? (rainingNow || sched.wetAt(t)) : sched.wetAt(t))
+                      : rainingNow;
+    if (wet && wetting){
+      vSoil = p.soilPerMin;                       // rate holds while it rains
+    } else {
+      vSoil *= Math.exp(-FC_STEP_MIN/FC_DRY_DECAY_TAU_MIN);   // shower ending
+    }
+    soil = Math.max(SOIL_FLOOR, soil + vSoil*FC_STEP_MIN);
+    if (satAt === null && soil <= SOIL_FLOOD_THRESHOLD) satAt = t;
+
+    if (vWater > 0.2){                            // already rising: project it
+      water += vWater*FC_STEP_MIN;
+      if (contactAt === null && water > WATER_FLOOD_THRESHOLD) contactAt = t;
+    }
+    path.push({t, soil, water});
+    if (contactAt !== null) break;
+  }
+
+  // Stage timeline. Everything already true is "now"; everything ahead is
+  // labelled with what it actually rests on.
+  const stages = [];
+  const rainEta = rainingNow ? 0 : (sched ? sched.startsInMin : null);
+  stages.push({key:"rain", label:`Rain <${RAIN_THRESHOLD}`, eta:rainEta,
+               basis: rainingNow ? "measured" : "forecast"});
+  stages.push({key:"wet", label:`Soil <${SOIL_HEALTHY_FLOOR}`,
+               eta: p.last.soil < SOIL_HEALTHY_FLOOR ? 0 : null, basis:"measured"});
+  stages.push({key:"sat", label:`Soil ≤${SOIL_FLOOD_THRESHOLD}`,
+               eta: p.last.soil <= SOIL_FLOOD_THRESHOLD ? 0 : satAt,
+               basis: satAt !== null && !rainingNow && rainEta !== null ? "forecast" : "measured"});
+  stages.push({key:"flood", label:`Water >${WATER_FLOOD_THRESHOLD}`,
+               eta: p.last.water > WATER_FLOOD_THRESHOLD ? 0 : contactAt,
+               basis: contactAt !== null ? "measured" : "unmeasured"});
+
+  const floodEta = p.last.water > WATER_FLOOD_THRESHOLD ? 0 : contactAt;
+
+  // Confidence: trend fit, then penalties for leaning on a forecast, for a
+  // short history, and for the uncalibrated fast-drop gap.
+  const reasons = [];
+  let score = p.r2;
+  if (p.hist.length < PREDICT_WINDOW){ score *= 0.75; reasons.push("short history"); }
+  if (!rainingNow && rainEta !== null && satAt !== null){ score *= 0.6; reasons.push("depends on forecast rain"); }
+  if (satAt !== null && contactAt === null){ reasons.push("saturation→water interval never timed"); }
+  if (!sched){ score *= 0.8; reasons.push("no live forecast"); }
+  const label = score >= 0.7 ? "high" : score >= 0.4 ? "moderate" : "low";
+
+  return {
+    sched, rainingNow, stages, satAt, contactAt, floodEta, path,
+    confidence:{score, label, reasons},
+    fc:{h1: sched?sched.total(1):null, h3: sched?sched.total(3):null,
+        h6: sched?sched.total(6):null, h12: sched?sched.total(12):null},
+    agrees: sched ? ((sched.total(6) >= 2) === wetting) : null
+  };
+}
+
 // Rain in the NEXT `hours` hours from the Open-Meteo hourly array.
 function forecastRain(data, hours){
   if (!data?.hourly?.time) return null;
@@ -1553,46 +1689,66 @@ function renderPrediction(){
     return;
   }
 
-  const conf = confidenceLabel(p.r2, p.hist.length);
-  const fc6 = weatherCache ? forecastRain(weatherCache.data, 6) : null;
-  const fc12 = weatherCache ? forecastRain(weatherCache.data, 12) : null;
-
   const a = assessLevel(node);
   const zone = soilZone(p.last.soil);
+  const f = floodForecast(node, p, weatherCache ? weatherCache.data : null);
+  p.forecast = f;
+
   const LEVEL_CLS = {0:"calm", 1:"watch", 2:"urgent", 3:"urgent"};
   const LEVEL_NAME = {0:"Normal", 1:"Watch", 2:"Warning", 3:"Flood"};
-  const cls = LEVEL_CLS[a.level];
-  const etaTxt = a.level === 3 ? "now" : fmtEta(p.eta);
+  let cls = LEVEL_CLS[a.level];
+  // A forecast crossing can raise urgency above the present-state level --
+  // that is the whole point of predicting rather than classifying.
+  if (a.level < 2 && f.satAt !== null && f.satAt <= 60) cls = "watch";
 
-  // The level is the brief's rule set; the ETA is our projection. Keep them
-  // visibly separate — one is a spec, the other is an extrapolation.
+  const headline = a.level === 3 ? "now"
+                 : f.floodEta !== null ? fmtEta(f.floodEta)
+                 : f.satAt !== null ? fmtEta(f.satAt)
+                 : "—";
+
   let text = `<b>L${a.level} ${LEVEL_NAME[a.level]}</b> — ${a.reason}.`;
-  if (a.level < 3 && p.eta !== null){
-    text += ` Trend reaches ${p.driver === "soil" ? `soil ${SOIL_FLOOD_THRESHOLD}` : `water ${WATER_FLOOD_THRESHOLD}`} in ~${etaTxt}, confidence ${conf.txt} (${conf.note}).`;
-  } else if (a.level < 3){
-    text += ` No threshold crossing projected within ${PREDICT_HORIZON_MIN} min.`;
+  if (a.level < 3){
+    if (f.floodEta !== null){
+      text += ` Water on track to cross ${WATER_FLOOD_THRESHOLD} in ~${fmtEta(f.floodEta)}.`;
+    } else if (f.satAt !== null){
+      text += f.rainingNow
+        ? ` Saturation in ~${fmtEta(f.satAt)} if this rain holds.`
+        : ` Saturation in ~${fmtEta(f.satAt)}, but only if the forecast rain arrives.`;
+      text += ` Standing water follows — that interval has never been timed.`;
+    } else {
+      text += ` No saturation projected inside ${FC_HORIZON_MIN/60}h.`;
+    }
+  }
+  if (f.agrees === false){
+    text += f.fc.h6 >= 2
+      ? ` Forecast says ${f.fc.h6}mm/6h while the ground is steady — the trend cannot see that coming.`
+      : ` Ground is wetting with only ${f.fc.h6}mm forecast — check irrigation, drainage or the probe.`;
   }
   if (a.unsupported) text += ` Rain and soil both read dry — check the node for splash or a fault.`;
   if (a.soilFault) text += ` Soil probe reads ≥${SOIL_FAULT_FLOOR}; excluded from the decision.`;
-  if (fc6 !== null && a.level < 2 && fc6 >= 8) text += ` Forecast ${fc6}mm/6h not seen by the trend.`;
+  text += ` Confidence <b>${f.confidence.label}</b>${f.confidence.reasons.length?` (${f.confidence.reasons.join("; ")})`:""}.`;
 
+  const BASIS_CLS = {measured:"b-meas", forecast:"b-fc", unmeasured:"b-unk"};
   body.innerHTML = `
     <div class="verdict ${cls}">
-      <div class="v-eta">${etaTxt}</div>
+      <div class="v-eta">${headline}</div>
       <div class="v-text">${text}</div>
     </div>
     <div class="predict-metrics">
       <div class="pm"><div class="k">Soil</div><div class="v">${p.last.soil}</div><div class="s">${p.soilPerMin>=0?"+":""}${p.soilPerMin.toFixed(1)}/min</div></div>
       <div class="pm"><div class="k">Water</div><div class="v">${p.last.water}</div><div class="s">${p.waterPerMin>=0?"+":""}${p.waterPerMin.toFixed(1)}/min</div></div>
-      <div class="pm"><div class="k">Rain</div><div class="v">${rainNode.raw}</div><div class="s">${rainNode.raw < RAIN_THRESHOLD ? "raining" : "dry"}</div></div>
-      <div class="pm"><div class="k">Soil ETA</div><div class="v">${fmtEta(p.soilEta)}</div></div>
-      <div class="pm"><div class="k">Water ETA</div><div class="v">${fmtEta(p.waterEta)}</div></div>
+      <div class="pm"><div class="k">Rain</div><div class="v">${rainNode.raw}</div><div class="s">${f.rainingNow?"raining":"dry"}</div></div>
+      <div class="pm"><div class="k">Saturation</div><div class="v">${fmtEta(f.satAt)}</div><div class="s">to ${SOIL_FLOOD_THRESHOLD}</div></div>
+      <div class="pm"><div class="k">Flood</div><div class="v">${fmtEta(f.floodEta)}</div><div class="s">water &gt;${WATER_FLOOD_THRESHOLD}</div></div>
       <div class="pm"><div class="k">Zone</div><div class="v" style="font-size:10.5px;">${zone.short}${zone.est?' <span class="est">est</span>':''}</div></div>
-      <div class="pm"><div class="k">Forecast</div><div class="v">${fc6===null?"—":fc6+"mm"}</div><div class="s">6h${fc12===null?"":` · ${fc12}mm 12h`}</div></div>
+      <div class="pm"><div class="k">Rain fcst</div><div class="v">${f.fc.h6===null?"—":f.fc.h6+"mm"}</div><div class="s">6h${f.fc.h12===null?"":` · ${f.fc.h12}mm 12h`}</div></div>
     </div>
-    <div class="cascade">${["Rain &lt;980","Soil &lt;552","Soil ≤436","Water &gt;30"].map((step,i)=>{
-      const reached = [rainNode.raw<RAIN_THRESHOLD, p.last.soil<SOIL_HEALTHY_FLOOR, p.last.soil<=SOIL_FLOOD_THRESHOLD, p.last.water>WATER_FLOOD_THRESHOLD][i];
-      return `<span class="cs ${reached?'on':''}">${step}</span>`;
+    <div class="cascade">${f.stages.map(st=>{
+      const reached = st.eta === 0;
+      const pending = st.eta !== null && st.eta > 0;
+      const eta = pending ? ` <b>${fmtEta(st.eta)}</b>` : "";
+      const basis = !reached ? ` <i class="${BASIS_CLS[st.basis]}">${st.basis==="unmeasured"?"untimed":st.basis}</i>` : "";
+      return `<span class="cs ${reached?'on':pending?'due':''}">${st.label}${eta}${basis}</span>`;
     }).join('<span class="cs-arrow">→</span>')}</div>
     <div class="predict-chart-box"><canvas id="predict-chart"></canvas></div>`;
 
@@ -1602,32 +1758,35 @@ function renderPrediction(){
 function drawPredictChart(p){
   const el = document.getElementById("predict-chart");
   if (!el) return;
-  const useSoil = p.driver !== "water";
-  const series = useSoil ? p.hist.map(h=>h.soil) : p.hist.map(h=>h.water);
-  const fit = useSoil ? p.soilFit : p.waterFit;
-  const threshold = useSoil ? SOIL_FLOOD_THRESHOLD : WATER_FLOOD_THRESHOLD;
-  const t0 = p.hist[0].t;
+  // Plot the soil series and the forecast's own simulated path, so the curve
+  // on screen is the thing the ETA came from — including where it bends as
+  // the forecast goes dry and the wetting rate decays.
+  const f = p.forecast;
+  const series = p.hist.map(h=>h.soil);
+  const threshold = SOIL_FLOOD_THRESHOLD;
+  const proj = f ? f.path.slice(1).map(pt=>pt.soil) : [];
+  const cap = Math.min(proj.length, 72);
+  const projCapped = proj.slice(0, cap);
 
-  // Project forward to the ETA, or 45 simulated minutes if there is none.
-  const stepMs = READ_INTERVAL_MS;
-  const spanMin = p.eta !== null ? Math.min(p.eta, PREDICT_HORIZON_MIN) : 45;
-  const steps = Math.max(3, Math.min(60, Math.ceil(spanMin*60000/stepMs)));
-  const lastX = p.hist[p.hist.length-1].t - t0;
-
-  const proj = [];
-  for (let i=1; i<=steps; i++){
-    proj.push(fit.slope*(lastX + i*stepMs) + fit.intercept);
-  }
   const labels = [
     ...p.hist.map((_,i)=>i-p.hist.length+1),
-    ...proj.map((_,i)=>i+1)
+    ...projCapped.map((_,i)=>i+1)
   ];
-  const actual = [...series, ...Array(proj.length).fill(null)];
-  const projected = [...Array(series.length-1).fill(null), series[series.length-1], ...proj];
+  const actual = [...series, ...Array(projCapped.length).fill(null)];
+  const projected = [...Array(series.length-1).fill(null), series[series.length-1], ...projCapped];
+  // Shade the stretch the forecast says is wet, so "why does it bend there"
+  // is answerable from the chart.
+  const rainBand = labels.map((l,i)=>{
+    if (l <= 0) return null;
+    const minsAhead = l*(READ_INTERVAL_MS/60000);
+    const wet = f && f.sched ? (minsAhead < 60 ? (f.rainingNow || f.sched.wetAt(minsAhead)) : f.sched.wetAt(minsAhead)) : f && f.rainingNow;
+    return wet ? threshold : null;
+  });
 
   const cs = getComputedStyle(document.documentElement);
-  const accent = cs.getPropertyValue(useSoil ? "--water" : "--purple").trim();
+  const accent = cs.getPropertyValue("--water").trim();
   const red = cs.getPropertyValue("--red").trim();
+  const rainCol = cs.getPropertyValue("--purple").trim();
 
   if (predictChart) predictChart.destroy();
   predictChart = new Chart(el, {
@@ -1635,7 +1794,8 @@ function drawPredictChart(p){
     data:{labels, datasets:[
       {label:"Measured", data:actual, borderColor:accent, backgroundColor:"transparent", borderWidth:2, pointRadius:0},
       {label:"Projected", data:projected, borderColor:accent, backgroundColor:"transparent", borderWidth:1.5, borderDash:[4,4], pointRadius:0},
-      {label:"Threshold", data:labels.map(()=>threshold), borderColor:red, backgroundColor:"transparent", borderWidth:1, borderDash:[2,3], pointRadius:0}
+      {label:"Threshold", data:labels.map(()=>threshold), borderColor:red, backgroundColor:"transparent", borderWidth:1, borderDash:[2,3], pointRadius:0},
+      {label:"Rain forecast", data:rainBand, borderColor:rainCol, backgroundColor:"transparent", borderWidth:4, pointRadius:0, spanGaps:false}
     ]},
     options:{
       responsive:true, maintainAspectRatio:false, animation:false,
