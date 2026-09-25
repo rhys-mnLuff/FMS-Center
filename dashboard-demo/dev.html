@@ -120,8 +120,13 @@
   .section-title span{font-size:11px; color:var(--muted);}
 
   /* stat grid */
-  .stat-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px;}
-  .stat-tile{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius-sm); padding:12px 14px;}
+  /* Fixed tracks, not auto-fit: 14 fleet tiles land as two even rows of 7
+     instead of 8 + a ragged 6, and 6 economics tiles as one row of 6. */
+  .stat-grid{display:grid; grid-template-columns:repeat(8,1fr); gap:8px;}
+  #economics-stats{grid-template-columns:repeat(6,1fr);}
+  @media (max-width:1240px){ .stat-grid{grid-template-columns:repeat(4,1fr);} #economics-stats{grid-template-columns:repeat(3,1fr);} }
+  @media (max-width:780px){ .stat-grid, #economics-stats{grid-template-columns:repeat(2,1fr);} }
+  .stat-tile{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius-sm); padding:11px 13px; min-width:0;}
   .stat-tile .st-label{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px;}
   .stat-tile .st-value{font-size:20px; font-weight:600; font-family:var(--mono); font-variant-numeric:tabular-nums; margin-top:4px; letter-spacing:-.02em;}
   .stat-tile .st-sub{font-size:10.5px; color:var(--muted); margin-top:2px;}
@@ -189,9 +194,11 @@
   .chart-card canvas{max-height:200px; max-width:100%;}
 
   /* ---- flood prediction ---- */
-  .predict-wrap{display:grid; grid-template-columns:minmax(300px,0.85fr) 1.15fr; gap:12px; align-items:start;}
+  .predict-wrap{display:grid; grid-template-columns:minmax(300px,0.85fr) 1.15fr; gap:12px; align-items:stretch;}
   .predict-wrap > *{min-width:0;}
   @media (max-width:1000px){ .predict-wrap{grid-template-columns:1fr;} }
+  .predict-map-panel{display:flex; flex-direction:column;}
+  .predict-map-panel #map{flex:1; min-height:280px; height:auto;}
   .map-legend{display:flex; flex-wrap:wrap; gap:12px; margin-top:9px; font-size:10.5px; color:var(--muted);}
   .map-legend i{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align:baseline;}
   .predict-head{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:12px;}
@@ -307,31 +314,35 @@
   }
   .rain-head .rh-icon svg{width:18px;height:18px;}
   .rain-head h3{font-size:13.5px; font-weight:600;}
-  .rain-body{display:flex; gap:26px; align-items:center; flex-wrap:wrap;}
+  /* Dial, then the readings as compact cells, then the caveat — rather than
+     four rows stretched the full width with the values stranded at the edge. */
+  .rain-body{display:grid; grid-template-columns:auto auto 1fr; gap:24px; align-items:center;}
+  @media (max-width:980px){ .rain-body{grid-template-columns:auto 1fr;} .rain-body .rain-note{grid-column:1/-1;} }
+  @media (max-width:720px){ .rain-body{grid-template-columns:1fr; justify-items:start;} }
   .rain-gauge-dial{
-    width:120px; height:120px; border-radius:50%; flex:none; position:relative;
-    background: conic-gradient(var(--gauge-color, var(--purple)) calc(var(--gauge-val, 0)*1%), var(--bg-soft) 0);
+    width:96px; height:96px; border-radius:50%; flex:none; position:relative;
+    background: conic-gradient(var(--gauge-color, var(--purple)) calc(var(--gauge-val, 0)*1%), var(--card-border) 0);
   }
   /* ::after is the last child, so without an explicit z-index it paints over
      .rgd-inner and hides the readout entirely. */
-  .rain-gauge-dial::after{ content:""; position:absolute; inset:11px; border-radius:50%; background:var(--card); z-index:0; }
+  .rain-gauge-dial::after{ content:""; position:absolute; inset:9px; border-radius:50%; background:var(--card); z-index:0; }
   .rain-gauge-dial .rgd-inner{
     position:absolute; inset:0; z-index:1;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
   }
-  .rain-gauge-dial .rgd-value{position:relative; font-family:var(--mono); font-size:24px; font-weight:600; line-height:1; font-variant-numeric:tabular-nums;}
+  .rain-gauge-dial .rgd-value{position:relative; font-family:var(--mono); font-size:20px; font-weight:600; line-height:1; font-variant-numeric:tabular-nums;}
   .rain-gauge-dial .rgd-label{position:relative; font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-top:3px;}
-  .rain-stats{display:flex; flex-direction:column; gap:10px; flex:1; min-width:180px;}
-  .rain-stat-row{display:flex; justify-content:space-between; align-items:center; font-size:12.5px; padding-bottom:8px; border-bottom:1px dashed var(--line);}
-  .rain-stat-row:last-child{border-bottom:none; padding-bottom:0;}
-  .rain-stat-row .rs-label{color:var(--muted);}
-  .rain-stat-row .rs-value{font-weight:700; font-family:var(--mono); color:var(--ink);}
+  .rain-stats{display:grid; grid-template-columns:repeat(4,minmax(0,140px)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--radius-sm); overflow:hidden;}
+  @media (max-width:720px){ .rain-stats{grid-template-columns:repeat(2,1fr); width:100%;} }
+  .rain-stat-row{display:flex; flex-direction:column; gap:3px; background:var(--card); padding:9px 11px; min-width:0;}
+  .rain-stat-row .rs-label{color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.5px; font-weight:600;}
+  .rain-stat-row .rs-value{font-weight:600; font-size:13.5px; font-family:var(--mono); color:var(--ink); font-variant-numeric:tabular-nums;}
   .rain-trend{display:inline-flex; align-items:center; gap:4px; font-weight:600;}
   .rain-trend svg{width:12px;height:12px;}
   .rain-trend.up{color:var(--purple);}
   .rain-trend.down{color:var(--green);}
   .rain-trend.flat{color:var(--muted);}
-  .rain-note{font-size:11px; color:var(--muted); margin-top:16px; padding-top:14px; border-top:1px dashed var(--line); line-height:1.55;}
+  .rain-note{font-size:10.5px; color:var(--muted); line-height:1.6; max-width:34ch;}
 
   .split{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
   @media (max-width:1000px){ .split{grid-template-columns:1fr;} }
@@ -466,8 +477,8 @@
         <div class="rain-stat-row"><span class="rs-label">Trend</span><span class="rs-value" id="rain-trend">—</span></div>
         <div class="rain-stat-row"><span class="rs-label">Last reading</span><span class="rs-value" id="rain-lastseen">—</span></div>
       </div>
+      <div class="rain-note">Not built. Sensor type, polarity and thresholds are placeholders.</div>
     </div>
-    <div class="rain-note">Not built. Sensor type, polarity and thresholds are placeholders.</div>
   </div>
 
   <div class="section-title"><h2>Per-Node Sensors</h2></div>
