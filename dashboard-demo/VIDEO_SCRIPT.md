@@ -1,162 +1,192 @@
-# FMS — demo video script
+# FMS — video script (pre-recorded)
 
-Console: `dashboard-demo/dev.html`. Everything below is driven by the
-**▶ Run flood sequence** button, which runs the same seven beats every take at
-4× speed (~90 seconds end to end). Press it once and narrate over it.
+Target **2:42**. Voiceover recorded separately from picture, so nothing has to
+be narrated in real time and every shot can be retaken.
 
-Before recording: hard-refresh the page so the event log starts clean.
-
----
-
-## Cold open — 0:00–0:15
-
-**On screen:** top of the console, before pressing anything.
-
-> This is the technician console for FMS. Three solar sensor nodes in a rice
-> paddy in Chiang Mai, reporting soil moisture and water level over radio to a
-> single base station. No WiFi, no mains power, one SIM for the whole farm.
->
-> Everything you're about to see runs on readings from those probes.
-
-**Point at:** the fleet strip — 3/3 nodes, average soil, average water.
+Word counts below are timed at ~150 wpm. If you speak faster, pad the screen
+captures rather than cutting words.
 
 ---
 
-## The problem — 0:15–0:35
+## Assets you already have
 
-**On screen:** the Nodes — Raw Telemetry table.
-
-> The sensors give you numbers like these. Soil 657. Water 0. On their own they
-> mean nothing to a farmer — and by the time water actually reaches the probe,
-> the field is already flooding. You've been told about a flood you can see out
-> the window.
->
-> The useful question isn't "is it flooding." It's "how long do I have."
-
----
-
-## The algorithm — 0:35–1:20
-
-**On screen:** scroll to **How the prediction works**. Walk the five boxes
-left to right as you talk. The numbers in them are live.
-
-> **Inputs.** Three probes, all 10-bit, all disagreeing about direction. Water
-> reads *up* when wet. Soil and rain read *down*. Plus the live rainfall
-> forecast for these coordinates.
->
-> **Normalise.** First step is putting them on one scale — zero is dry, one is
-> wet — using the dry and saturated values we measured on the bench.
->
-> **Classify.** Each reading falls into a band. Soil 436 or below is saturated.
-> Water above 30 is standing water. Rain below 980 means it's falling. Those
-> thresholds come from our own calibration, padded past the noise so a single
-> stray drop can't fire an alert.
->
-> **Project.** This is the part that buys time. We fit the rate of change from
-> the last two dozen readings — how fast is this field wetting, right now — and
-> run it forward. The forecast decides how long that rate survives: while rain
-> is falling or expected, it holds; when the forecast clears, it decays.
->
-> **Output.** Time to saturation, time to standing water, and a confidence
-> figure from how well the trend actually fits.
-
----
-
-## The prediction firing — 1:20–2:10
-
-**Press ▶ Run flood sequence.** Follow the banner. Beats to hit:
-
-| Banner step | Say this |
+| File | Use |
 |---|---|
-| 2 · Rain begins | "The rain gauge drops below 980. Nothing has happened to the soil yet." |
-| 3 · Soil wetting | "Now the ground starts taking it up. The node moves to Watch." |
-| 4 · Prediction | **The money shot.** "Saturation in two minutes — and look at the state: still Watch. Nothing has crossed a flood threshold yet. This is the warning arriving before the event." |
-| 5 · Saturation | "Soil crosses 436. The prediction was right." |
-| 6 · Standing water | "Water passes 30. Flood confirmed, SMS fires with a map pin." |
-| 7 · Draining | "It clears through a hysteresis band so the alert can't flicker." |
+| `website/intro site/images/field-site.jpg` | the pilot paddy, wide — opener |
+| `context-paddy-farmers.jpg` | farmers planting — stakes |
+| `context-storm-field.jpg` | storm cell — stakes |
+| `field-deployed.jpg` | node alone in standing water |
+| `unit-panel.jpg` | node + 20W panel |
+| `unit-detail.jpg` | electronics through the clear lid |
+| `bench-calibration.mp4` | 11s, probe in a soil sample |
+| `dashboard-demo/dev.html` | all screen capture |
 
-**Point at:** the cascade strip lighting up left to right — rain, soil, soil
-saturated, water. That's the physical sequence of a flood, and the system walks
-it one stage at a time.
+Stills need motion or they read as a slideshow — slow push-in (~5% over the
+shot) on every one.
 
 ---
 
-## Honesty beat — 2:10–2:30
+## Shot list
 
-Do not skip this. It is the strongest thing in the video, and a judge will find
-it anyway.
+| # | Time | Picture | Audio |
+|---|---|---|---|
+| 1 | 0:00–0:14 | `field-site.jpg`, slow push | VO 1 |
+| 2 | 0:14–0:30 | `context-storm-field.jpg` → `context-paddy-farmers.jpg` | VO 2 |
+| 3 | 0:30–0:52 | `field-deployed.jpg` → `unit-panel.jpg` → `unit-detail.jpg` | VO 3 |
+| 4 | 0:52–1:06 | `bench-calibration.mp4`, full 11s | VO 4 |
+| 5 | 1:06–1:52 | Screen: pipeline panel, capture A | VO 5 |
+| 6 | 1:52–2:16 | Screen: prediction firing, capture B | VO 6 |
+| 7 | 2:16–2:32 | Screen: Provenance block, capture C | VO 7 |
+| 8 | 2:32–2:42 | `field-site.jpg` again, wider | VO 8 |
 
-> Two things this doesn't know yet. The gap between the soil saturating and
-> water reaching the probe has never been timed — so we report it as unknown
-> rather than guessing. And the healthy-soil band is from clay-loam literature,
-> not our own tests, so it's marked "est" everywhere it appears.
+---
+
+## Voiceover
+
+**VO 1** — 0:00–0:14
+
+> Every wet season, farmers in the Philippines lose crops to water they didn't
+> see coming. Not because the flood was unpredictable. Because nobody was
+> measuring the ground it started in.
+
+**VO 2** — 0:14–0:30
+
+> One storm last season did six hundred and ninety million pesos of
+> agricultural damage. The equipment that could have given warning costs over a
+> thousand dollars a site. For a smallholder with four hectares, that maths has
+> never worked.
+
+**VO 3** — 0:30–0:52
+
+> FMS is a solar-powered sensor node. It reads soil moisture and standing water,
+> relays over radio to a base station, and texts the farmer directly. No WiFi.
+> No mains power. One SIM card for an entire farm. Target cost, about a hundred
+> and twenty dollars a node.
+
+**VO 4** — 0:52–1:06
+
+> Every threshold in the system traces back to this — a real soil sample, logged
+> dry and logged saturated, so a number in the field means something.
+
+**VO 5** — 1:06–1:52 *(the algorithm — the core of the entry)*
+
+> Water reaching the surface is the *last* thing that happens in a flood. The
+> soil saturates first — and that gap is the warning.
 >
-> Everything measured is measured. Everything estimated says so.
+> Five steps. Three probes that don't agree on direction — water reads up when
+> wet, soil and rain read down — normalised onto one scale. Each reading
+> classified into a band from our own calibration. Then the rate of change,
+> fitted from the last two dozen readings: how fast is this field wetting, right
+> now. And that rate run forward, with the live rainfall forecast deciding how
+> long it holds — while rain is expected it persists, when the forecast clears
+> it decays.
+>
+> Out: time to saturation, time to standing water, confidence.
 
-**Point at:** the Provenance block — measured / estimated / not yet tested /
-simulated.
+**VO 6** — 1:52–2:16 *(over the prediction firing)*
+
+> Watch the state field. The node is still only on Watch — nothing has crossed a
+> flood threshold — and the system is already saying saturation in two minutes.
+>
+> Then soil crosses four three six. Then water passes thirty, and the alert
+> fires with a map pin. The prediction arrived before the flood did. That's the
+> entire product.
+
+**VO 7** — 2:16–2:32
+
+> Where we don't know, we say so. The gap between saturation and water reaching
+> the probe has never been timed — we report it unknown, not guessed. The
+> healthy-soil band is published data, not our bench. It's marked estimated.
+
+**VO 8** — 2:32–2:42
+
+> Same question a thousand-dollar station answers — how long do I have — at a
+> price a smallholder can actually reach.
 
 ---
 
-## Close — 2:30–2:45
+## Screen captures
 
-> A commercial flood telemetry station costs upwards of a thousand dollars per
-> site. Our target is about $120 a node, one SIM per farm, no per-sensor
-> subscription. Same question answered — how long do I have — at a price a
-> smallholder can actually reach.
+Hard-refresh (⌘⇧R) before each one so the event log starts clean. Record the
+browser at 1400px wide or more; below that the pipeline panel reflows to two
+columns and reads badly on video.
+
+**Capture A — the pipeline** (need ~45s)
+Scroll to **How the prediction works**. Start the flood sequence so the numbers
+are moving, then sit on the panel. In the edit, push slowly left to right across
+the five boxes to match VO 5. Don't cut between boxes — one continuous move.
+
+**Capture B — the prediction firing** (need ~30s)
+Press **▶ Run flood sequence**, then frame the Flood Prediction panel with the
+telemetry table visible above it. The beat you need is step 4 of 7, where the
+big number reads ~2 min and the node's state still says Watch. Let it run
+through steps 5 and 6 so saturation and the flood alert land in the same take.
+
+If the lead time doesn't appear, the node hasn't built enough readings since the
+reset — let the sequence run once, stop it, and start it again.
+
+**Capture C — provenance** (need ~18s)
+Scroll to the **Provenance** block. Static shot, slow push. Four columns:
+measured, estimated, not yet tested, simulated here.
+
+---
+
+## Captions to burn in
+
+Use these over the screen captures so a muted viewer still follows it:
+
+- `Soil 657 · Water 0 · Rain 1014` — over capture A's input box
+- `Saturation in 2 min — state still WATCH` — over the capture B money shot
+- `Measured · Estimated · Not yet tested` — over capture C
+
+---
+
+## Required disclosure
+
+Once, on screen, early — a lower third over shot 3 or 4:
+
+> Sensor readings simulated. Ranges from our own bench calibration.
+
+That covers the whole video. During the flood sequence the console also
+substitutes a synthetic rainfall forecast — because the algorithm correctly
+refuses to predict wetting the real forecast doesn't support, and on a dry day
+there'd be nothing to film. It labels itself: the banner reads **"demo weather
+substituted"** and the forecast tile carries a `DEMO` tag. **Don't crop either
+one out.** If a judge freeze-frames, the label should be in shot.
 
 ---
 
 # Language rules
 
-## Say this
+## Say
 
 - "predictive model", "forward projection", "sensor fusion"
 - "combines three sensor streams with live forecast data"
-- "calculates time-to-event with a confidence bound"
-- "algorithmic prediction from calibrated thresholds"
+- "time-to-event with a confidence bound"
+- "thresholds from our own calibration"
 
-## Do NOT say this
+## Never say
 
 - ❌ "AI-powered" / "machine learning" / "neural network" / "trained on"
-- ❌ "it learns from the data"
-- ❌ "95% accurate" — there is no validation set; nothing has been scored
-- ❌ any claim that the healthy band or the fast-drop rate was measured
+- ❌ "it learns"
+- ❌ any accuracy percentage — there is no validation set, nothing has been scored
+- ❌ that the healthy band or the fast-drop rate was measured
 
-**Why this matters.** The algorithm is deterministic — rules from your bench
-calibration plus a linear projection. There is no model and no training data.
-That is defensible engineering and it beats a black box for a system people
-rely on, but it is not machine learning. If the competition's AI requirement is
-literal, this entry does not meet it, and it is much better to know that now
-than to be asked on stage what it was trained on.
+**Why.** The algorithm is deterministic: calibrated thresholds plus a linear
+projection with a decay term. No model, no training data. That is honest
+engineering and it beats a black box for something people rely on — but it is
+not machine learning, and if the competition's AI requirement is literal, this
+entry doesn't meet it. Better to know now than to be asked on stage.
 
-If a judge asks directly — **"is this AI?"** — the honest answer that still
-lands well:
+If a judge asks **"is this AI?"** —
 
 > It's a predictive model rather than a learned one. We fuse three sensor
 > streams with external forecast data to project time-to-flood. We deliberately
-> didn't use machine learning, because we have one soil type, one node and one
-> calibration round — there isn't enough data to train anything honest, and a
-> model that's confidently wrong about a flood is worse than no model. The
-> path to learning is there: log one real wetting event and the rate constant
-> we currently leave switched off becomes fittable.
+> didn't use machine learning: we have one soil type, one node, one calibration
+> round. There isn't enough data to train anything honest, and a model that's
+> confidently wrong about a flood is worse than no model. The path is there —
+> log one real wetting event and the rate constant we currently leave switched
+> off becomes fittable.
 
-That answer turns the weakness into judgement, which is what they're actually
-scoring.
-
----
-
-# What's simulated
-
-Say this once, early, and you're covered for the whole video:
-
-> The readings are simulated — the hardware exists but isn't logging yet. The
-> ranges come from our bench calibration, so a threshold means the same thing
-> here as it does in the field.
-
-During **Run flood sequence** the console also substitutes a synthetic rainfall
-forecast, because the algorithm correctly refuses to predict wetting that the
-real forecast doesn't support — on a dry Manila day there would be nothing to
-show. The banner says **"demo weather substituted"** while it runs and the
-forecast tile is tagged `DEMO`. Leave both visible; if anyone freeze-frames,
-the label is right there.
+That answers the question and reframes the gap as judgement, which is what's
+actually being scored.
