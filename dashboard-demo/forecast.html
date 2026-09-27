@@ -235,22 +235,22 @@ const FIELDS = [
    snapshot. Values stay inside the brief's measured envelope and carry
    its ~5% inter-reading wobble, which is why the cards jitter slightly
    instead of moving smoothly -- that is what the probe actually does. */
-const READ_INTERVAL_MS = 10000;
+const READ_INTERVAL_MS = 4000;
 const noise = n => (Math.random()-0.5)*n;
 
 function stepFields(){
   FIELDS.forEach(f=>{
     if (f.behaviour === "wetting"){
-      f.soil += (f.target - f.soil)*0.06 + noise(9);
+      f.soil += (f.target - f.soil)*0.10 + noise(11);
       if (f.soil <= SOIL_FLOOD_THRESHOLD) f.water += 2 + noise(3);
       if (f.soil < 415){ f.behaviour = "drying"; f.target = 620; }
     } else if (f.behaviour === "drying"){
-      f.soil += (f.target - f.soil)*0.04 + noise(9);
+      f.soil += (f.target - f.soil)*0.07 + noise(11);
       f.water = Math.max(0, f.water - 1.5);
       if (f.soil > f.target - 12){ f.behaviour = "steady"; f.target = f.soil; }
     } else {
-      f.soil += noise(11);
-      if (Math.random() < 0.03){ f.behaviour = "wetting"; f.target = f.soil - 180; }
+      f.soil += noise(14);
+      if (Math.random() < 0.06){ f.behaviour = "wetting"; f.target = f.soil - 180; }
     }
     f.soil  = Math.max(335, Math.min(1023, f.soil));
     f.water = Math.max(0, Math.min(260, f.water));
@@ -389,7 +389,7 @@ function renderAreas(){
         <div class="area-head">
           <div>
             <div class="area-name">${f.name}</div>
-            <div class="area-sub">${f.area} · drainage ${f.drainage} · <span style="color:var(--green)">reading ${Math.round((Date.now()-f.lastRead)/1000)}s ago</span></div>
+            <div class="area-sub">${f.area} · drainage ${f.drainage} · <span style="color:var(--green)" data-age="${f.lastRead}">reading 0s ago</span></div>
           </div>
           <span class="outlook ${ol.key}">${ol.label}</span>
         </div>
@@ -408,11 +408,15 @@ function renderAreas(){
 }
 
 async function load(){
+  renderAreas();          // ground state stands alone — never wait on weather
   try{
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${BASE.lat}&longitude=${BASE.lon}`
       + `&current=temperature_2m,precipitation,weather_code,relative_humidity_2m`
       + `&hourly=precipitation&forecast_hours=13&timezone=Asia%2FManila`;
-    const res = await fetch(url);
+    const ctl = new AbortController();
+    const bail = setTimeout(()=>ctl.abort(), 8000);
+    const res = await fetch(url, {signal: ctl.signal});
+    clearTimeout(bail);
     if (!res.ok) throw new Error("HTTP " + res.status);
     const d = await res.json();
     liveHours = (d.hourly.precipitation || []).slice(0,12);
@@ -459,7 +463,13 @@ try{ const t = localStorage.getItem("fms-theme"); if (t) document.documentElemen
 setInterval(()=>{ document.getElementById("clock").textContent = new Date().toLocaleTimeString([], {hour12:false}); }, 1000);
 document.getElementById("clock").textContent = new Date().toLocaleTimeString([], {hour12:false});
 load();
-setInterval(()=>{ stepFields(); if (wx) renderAreas(); }, READ_INTERVAL_MS);
+setInterval(()=>{ stepFields(); renderAreas(); }, READ_INTERVAL_MS);
+// the age counter ticks every second so the page is visibly alive between reads
+setInterval(()=>{
+  document.querySelectorAll("[data-age]").forEach(el=>{
+    el.textContent = `reading ${Math.round((Date.now() - Number(el.dataset.age))/1000)}s ago`;
+  });
+}, 1000);
 </script>
 </body>
 </html>
