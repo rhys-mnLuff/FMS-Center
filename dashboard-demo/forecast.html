@@ -221,12 +221,43 @@ const BASE = {lat:14.5333, lon:121.0000};
    entire point of measuring per field rather than per region. */
 const FIELDS = [
   {id:"1", name:"North Rice Paddy", area:"North block", soil:661, water:0,
-   drainage:"good",  note:"raised bund, drains to the north ditch"},
+   drainage:"good",  note:"raised bund, drains to the north ditch",
+   behaviour:"steady", target:661, lastRead:Date.now()},
   {id:"2", name:"East Canal Field", area:"Canal side",  soil:470, water:12,
-   drainage:"poor",  note:"lowest block, backs onto the canal"},
+   drainage:"poor",  note:"lowest block, backs onto the canal",
+   behaviour:"wetting", target:430, lastRead:Date.now()},
   {id:"3", name:"Riverside Plot",   area:"River flat",  soil:812, water:0,
-   drainage:"fair",  note:"sandy, dries fastest of the three"}
+   drainage:"fair",  note:"sandy, dries fastest of the three",
+   behaviour:"drying", target:880, lastRead:Date.now()}
 ];
+
+/* Readings tick like the console's so the page is live rather than a
+   snapshot. Values stay inside the brief's measured envelope and carry
+   its ~5% inter-reading wobble, which is why the cards jitter slightly
+   instead of moving smoothly -- that is what the probe actually does. */
+const READ_INTERVAL_MS = 10000;
+const noise = n => (Math.random()-0.5)*n;
+
+function stepFields(){
+  FIELDS.forEach(f=>{
+    if (f.behaviour === "wetting"){
+      f.soil += (f.target - f.soil)*0.06 + noise(9);
+      if (f.soil <= SOIL_FLOOD_THRESHOLD) f.water += 2 + noise(3);
+      if (f.soil < 415){ f.behaviour = "drying"; f.target = 620; }
+    } else if (f.behaviour === "drying"){
+      f.soil += (f.target - f.soil)*0.04 + noise(9);
+      f.water = Math.max(0, f.water - 1.5);
+      if (f.soil > f.target - 12){ f.behaviour = "steady"; f.target = f.soil; }
+    } else {
+      f.soil += noise(11);
+      if (Math.random() < 0.03){ f.behaviour = "wetting"; f.target = f.soil - 180; }
+    }
+    f.soil  = Math.max(335, Math.min(1023, f.soil));
+    f.water = Math.max(0, Math.min(260, f.water));
+    if (f.water < 3) f.water = 0;
+    f.lastRead = Date.now();
+  });
+}
 
 /* How fast each field takes on water per mm of rain, in raw ADC. This is a
    modelled figure, not measured — no wetting event has been logged yet.
@@ -279,7 +310,7 @@ function projectField(f, hours){
 }
 
 function outlookFor(f, proj, total12){
-  if (f.water > WATER_FLOOD_THRESHOLD) return {key:"high", label:"Flooding now"};
+  if (Math.round(f.water) > WATER_FLOOD_THRESHOLD) return {key:"high", label:"Flooding now"};
   if (proj.floodAt !== null && proj.floodAt <= 6) return {key:"high", label:"Flood likely"};
   if (proj.floodAt !== null) return {key:"watch", label:"Flood possible"};
   if (proj.satAt !== null) return {key:"watch", label:"Saturation likely"};
@@ -311,23 +342,27 @@ function renderRegional(){
 }
 
 function renderAreas(){
-  const hours = wx.hours.slice(0,12);
+  const haveWx = !!wx;
+  const hours = haveWx ? wx.hours.slice(0,12) : new Array(12).fill(0);
   const total12 = hours.reduce((a,b)=>a+b,0);
   const peak = Math.max(...hours, 1);
   const now = new Date();
 
   document.getElementById("areas").innerHTML = FIELDS.map(f=>{
-    const proj = projectField(f, hours);
-    const ol = outlookFor(f, proj, total12);
-    const z = zoneOf(f.soil);
+    const proj = projectField({...f, soil:Math.round(f.soil), water:Math.round(f.water)}, hours);
+    const ol = haveWx ? outlookFor(f, proj, total12) : {key:"low", label:"No forecast"};
+    const soilR = Math.round(f.soil), waterR = Math.round(f.water);
+    const z = zoneOf(soilR);
 
-    const lead = f.water > WATER_FLOOD_THRESHOLD ? "Flooding"
+    const lead = !haveWx ? `${soilR}` : waterR > WATER_FLOOD_THRESHOLD ? "Flooding"
                : proj.floodAt !== null ? fmtH(proj.floodAt)
                : proj.satAt !== null ? fmtH(proj.satAt)
                : "Clear 12h";
 
     let body;
-    if (f.water > WATER_FLOOD_THRESHOLD){
+    if (!haveWx){
+      body = `Ground state only — no rainfall forecast available, so no outlook is projected for <b>${f.area.toLowerCase()}</b>.`;
+    } else if (waterR > WATER_FLOOD_THRESHOLD){
       body = `Standing water in <b>${f.area}</b> now. ${f.note}.`;
     } else if (proj.floodAt !== null){
       body = `On the forecast rain, <b>${f.area}</b> reaches standing water in about <b>${fmtH(proj.floodAt)}</b>. Ground is ${z.label.toLowerCase()} and drainage here is ${f.drainage}.`;
@@ -354,19 +389,20 @@ function renderAreas(){
         <div class="area-head">
           <div>
             <div class="area-name">${f.name}</div>
-            <div class="area-sub">${f.area} · drainage ${f.drainage}</div>
+            <div class="area-sub">${f.area} · drainage ${f.drainage} · <span style="color:var(--green)">reading ${Math.round((Date.now()-f.lastRead)/1000)}s ago</span></div>
           </div>
           <span class="outlook ${ol.key}">${ol.label}</span>
         </div>
         <div class="verdict"><span class="lead">${lead}</span>${body}</div>
-        <div class="strip">${strip}</div>
-        <div class="strip-key">Hourly rainfall, mm · red hour = soil projected at or past ${SOIL_FLOOD_THRESHOLD}</div>
+        ${haveWx ? `<div class="strip">${strip}</div>
+        <div class="strip-key">Hourly rainfall, mm · red hour = soil projected at or past ${SOIL_FLOOD_THRESHOLD}</div>` :
+        `<div class="strip-key" style="padding:10px 0 14px;">Rainfall forecast unavailable — showing ground state only.</div>`}
         <div class="ground">
-          <div class="g"><div class="k">Soil now</div><div class="v ${z.cls}">${f.soil}</div></div>
+          <div class="g"><div class="k">Soil now</div><div class="v ${z.cls}">${soilR}</div></div>
           <div class="g"><div class="k">Condition</div><div class="v ${z.cls}" style="font-size:11px;">${z.label}</div></div>
-          <div class="g"><div class="k">Water</div><div class="v ${f.water>WATER_FLOOD_THRESHOLD?'bad':''}">${f.water}</div></div>
+          <div class="g"><div class="k">Water</div><div class="v ${waterR>WATER_FLOOD_THRESHOLD?'bad':''}">${waterR}</div></div>
         </div>
-        <div class="why"><b>Why this differs from the regional forecast:</b> ${f.note}. Same rain, but this block starts at ${f.soil} raw and sheds water ${f.drainage === "poor" ? "slowly" : f.drainage === "fair" ? "moderately" : "well"}, so it responds differently to the hours above.</div>
+        <div class="why"><b>Why this differs from the regional forecast:</b> ${f.note}. Same rain, but this block starts at ${soilR} raw and sheds water ${f.drainage === "poor" ? "slowly" : f.drainage === "fair" ? "moderately" : "well"}, so it responds differently to the hours above.</div>
       </div>`;
   }).join("");
 }
@@ -387,6 +423,7 @@ async function load(){
       `<div class="loading">Couldn't reach api.open-meteo.com — this page needs internet for the regional feed.
        <button class="btn" id="retry" style="margin-left:8px;">Retry</button></div>`;
     document.getElementById("retry").addEventListener("click", load);
+    renderAreas();   // ground readings stand on their own
   }
 }
 
@@ -422,6 +459,7 @@ try{ const t = localStorage.getItem("fms-theme"); if (t) document.documentElemen
 setInterval(()=>{ document.getElementById("clock").textContent = new Date().toLocaleTimeString([], {hour12:false}); }, 1000);
 document.getElementById("clock").textContent = new Date().toLocaleTimeString([], {hour12:false});
 load();
+setInterval(()=>{ stepFields(); if (wx) renderAreas(); }, READ_INTERVAL_MS);
 </script>
 </body>
 </html>
