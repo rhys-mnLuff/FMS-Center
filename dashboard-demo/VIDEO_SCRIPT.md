@@ -183,3 +183,34 @@ measure how steep it is") rather than in terms that need translating.
 
 **Never claim:** trained on · it learns · neural network · any accuracy
 percentage · that the healthy band (552–699) or the fast-drop rate was measured.
+
+---
+
+# ALTERNATIVE — Field Forecast as one continuous block
+
+Use this instead of Beats 1–6 if you'd rather narrate the forecast page in a
+single unbroken take. Runs about 1:05. Show the page, press `Simulate storm`,
+then read straight through while slowly panning across the three cards.
+
+> This is the same system looking forward instead of back — one card per field.
+>
+> In a real deployment, this is what a farmer opens in the morning. The top row
+> is the weather service: nearly forty millimetres of rain expected over the
+> next twelve hours. That's the number everyone in the province gets. On its
+> own, it doesn't tell you what to do about it.
+>
+> Underneath, every field is worked out separately, because every field starts
+> in a different condition. North block sits at 661 — healthy, drains fast — so
+> the rain passes through and nothing happens there. Riverside is at 821 and
+> drying out, so it just soaks it up.
+>
+> But canal side is already at 469. It's too wet before the storm even arrives,
+> there's water sitting on the sensor, and that block holds water instead of
+> shedding it. Same rain as the other two, and it floods in about two hours.
+>
+> That's the point of the whole thing. Not "it's going to rain" — but which of
+> your fields is in trouble, and how long you have to do something about it.
+
+**While reading:** start wide on all three cards, drift right to North block on
+"661", across to Riverside on "821", then settle on the canal side card for the
+last two paragraphs and stay there through the closing line.
