@@ -256,6 +256,25 @@
   .cs i.b-unk{color:var(--muted);}
   .cs-arrow{color:var(--muted); font-size:10px;}
 
+  /* Advisory layer: what a language model would be handed and what it would
+     send back. Templated for now — the badge says so. */
+  .advisory{display:grid; grid-template-columns:1.1fr 1fr; gap:12px;}
+  @media (max-width:900px){ .advisory{grid-template-columns:1fr;} }
+  .adv-col{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:14px 16px; min-width:0;}
+  .adv-h{font-size:9.5px; text-transform:uppercase; letter-spacing:.7px; font-weight:600; color:var(--muted); margin-bottom:10px;}
+  .adv-sms{
+    background:var(--green-bg); border:1px solid var(--green); border-radius:var(--radius-sm);
+    padding:12px 14px; font-size:13px; line-height:1.55; color:var(--ink); white-space:pre-line;
+  }
+  .adv-sms.warn{background:var(--amber-bg); border-color:var(--amber);}
+  .adv-sms.bad{background:var(--red-bg); border-color:var(--red);}
+  .adv-now{font-size:10.5px; color:var(--muted); margin-top:10px;}
+  .adv-now code{font-family:var(--mono); font-size:10px; background:var(--bg-soft); padding:2px 5px; border-radius:3px;}
+  .adv-tech{font-size:12px; line-height:1.65; color:var(--ink-soft);}
+  .adv-tech b{color:var(--ink);}
+  .adv-tech li{margin-bottom:5px;}
+  .adv-tech ul{margin:0; padding-left:16px;}
+
   /* Live pipeline view: the five stages with this node's real numbers in
      them, so it can be pointed at on camera instead of narrated blind. */
   .algo-flow{display:grid; grid-template-columns:1fr auto 1fr auto 1fr auto 1fr auto 1fr; gap:10px; align-items:stretch;}
@@ -494,6 +513,22 @@
       <div id="predict-body">
         <div class="predict-empty">Select a node to project its soil and water trend forward and cross-check it against the live regional forecast.</div>
       </div>
+    </div>
+  </div>
+
+  <div class="section-title">
+    <h2>Advisory Layer <span class="row-badge planned" style="margin-left:6px;">Planned · simulated</span></h2>
+    <span>language templated here — model not yet integrated</span>
+  </div>
+  <div class="advisory" id="advisory">
+    <div class="adv-col">
+      <div class="adv-h">Outbound SMS to the farmer</div>
+      <div class="adv-sms" id="adv-sms">—</div>
+      <div class="adv-now">What the firmware sends today: <code id="adv-raw">—</code></div>
+    </div>
+    <div class="adv-col">
+      <div class="adv-h">Technician note</div>
+      <div class="adv-tech" id="adv-tech">—</div>
     </div>
   </div>
 
@@ -1629,7 +1664,12 @@ function floodForecast(node, p, data){
   let soil = p.last.soil, water = p.last.water;
   let vSoil = p.soilPerMin;            // ADC/min, negative = wetting
   const vWater = p.waterPerMin;
-  const wetting = vSoil < -0.2;
+  /* "Wetting" has to clear the noise floor before anything is said about it.
+     The brief measures ~5% wobble between readings, which leaves a residual
+     drift of a couple of ADC/min after smoothing — enough to trip a -0.2
+     test on a field that is doing nothing. Require a real rate AND a fit
+     that supports it, or a flat node gets told to check its probe. */
+  const wetting = vSoil < -2 && p.r2 >= 0.3;
 
   const path = [{t:0, soil, water}];
   let satAt = null, contactAt = null;
@@ -1747,7 +1787,7 @@ function renderPrediction(){
     sub.textContent = "Pick a marker on the map, or a node below.";
     body.innerHTML = `<div class="predict-empty">Select a node to project its soil and water trend forward and cross-check it against the live regional forecast.</div>`;
     if (predictChart){ predictChart.destroy(); predictChart = null; }
-    renderAlgoPanel(null);
+    renderAlgoPanel(null); renderAdvisory(null);
     return;
   }
 
@@ -1830,7 +1870,75 @@ function renderPrediction(){
     <div class="predict-chart-box"><canvas id="predict-chart"></canvas></div>`;
 
   renderAlgoPanel(node, p, f, a);
+  renderAdvisory(node, p, f, a);
   drawPredictChart(p);
+}
+
+/* =========================================================================
+   ADVISORY LAYER — planned, simulated.
+
+   The gap this closes is real: Base_code currently texts "Soil: 455
+   Water: 75", which is a number dump a farmer cannot act on. The product
+   needs that turned into an instruction.
+
+   What is simulated here is ONLY the language generation — the sentences
+   below are templated, not written by a model. Every fact in them comes
+   from the live pipeline: the level from assessLevel(), the ETAs from
+   floodForecast(), the band from soilZone(), the rain from the forecast
+   feed. Swapping the templates for a real model call changes how these
+   read, not what they say.
+   ========================================================================= */
+function renderAdvisory(node, p, f, a){
+  const sms = document.getElementById("adv-sms");
+  const tech = document.getElementById("adv-tech");
+  const raw = document.getElementById("adv-raw");
+  if (!sms) return;
+
+  if (!node || !p || !p.ok){
+    sms.textContent = "—"; sms.className = "adv-sms";
+    tech.textContent = "Select a node."; raw.textContent = "—";
+    return;
+  }
+
+  const zone = soilZone(p.last.soil);
+  const field = node.name;
+  const lead = f.floodEta !== null ? f.floodEta : f.satAt;
+
+  // What the shipped firmware would send for this same reading.
+  raw.textContent = a.level >= 3
+    ? `FLOOD ALERT - Node ${node.id}! Soil: ${p.last.soil} Water: ${p.last.water}`
+    : `(no SMS — below threshold)`;
+
+  let cls = "", body;
+  if (a.level >= 3){
+    cls = "bad";
+    body = `${field}: water is standing in the field now. Move anything you can off this block and check the drain on the canal side.`;
+  } else if (f.satAt !== null && f.satAt <= 90){
+    cls = "warn";
+    body = `${field}: ground is filling up. On current rain you have roughly ${fmtEta(f.satAt)} before it is saturated.`
+         + (f.rainingNow ? ` Rain is falling now.` : ` This depends on the rain arriving as forecast.`);
+  } else if (a.level >= 1){
+    cls = "warn";
+    body = `${field}: wetter than ideal but not filling fast. Nothing to do yet — worth a look if the rain keeps up.`;
+  } else if (zone.key === "drying" || zone.key === "crit_dry"){
+    body = `${field}: ${zone.key === "crit_dry" ? "very dry — this block needs water" : "drying out, water it in the next day or two"}.`
+         + (f.fc.h12 !== null && f.fc.h12 >= 5 ? ` ${f.fc.h12}mm of rain forecast in the next 12h — you may not need to.` : ``);
+  } else {
+    body = `${field}: soil is in good condition. Nothing needed.`;
+  }
+  sms.className = "adv-sms " + cls;
+  sms.textContent = body;
+
+  // The technician view keeps the numbers the farmer message deliberately drops.
+  const bits = [];
+  bits.push(`<b>L${a.level}</b> — ${a.reason}.`);
+  bits.push(`Soil <b>${p.last.soil}</b> (${zone.label}${zone.est?", est band":""}), water <b>${p.last.water}</b>, rain <b>${rainNode.raw}</b>.`);
+  bits.push(`Trend <b>${p.soilPerMin>=0?"+":""}${p.soilPerMin.toFixed(1)}</b> ADC/min, fit r²=<b>${p.r2.toFixed(2)}</b>.`);
+  if (lead !== null) bits.push(`Projected <b>${fmtEta(lead)}</b> to ${f.floodEta!==null?"standing water":"saturation"}, confidence <b>${f.confidence.label}</b>.`);
+  if (f.agrees === false) bits.push(`<b>Forecast disagrees with the ground</b> — ${f.fc.h6}mm/6h expected. Check irrigation, drainage or the probe.`);
+  if (a.soilFault) bits.push(`<b>Soil probe ≥${SOIL_FAULT_FLOOR}</b> — likely out of the ground, excluded from the decision.`);
+  if (a.unsupported) bits.push(`<b>Water without rain or wet soil</b> — possible splash or fault.`);
+  tech.innerHTML = `<ul><li>${bits.join("</li><li>")}</li></ul>`;
 }
 
 /* Live pipeline view. Every figure shown is the same value the prediction
