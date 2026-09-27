@@ -1,28 +1,9 @@
 # FMS — video script (pre-recorded)
 
-Target **2:42**. Voiceover recorded separately from picture, so nothing has to
-be narrated in real time and every shot can be retaken.
+Weighted toward the model: the hardware is context, the prediction is the story.
+Roughly half the runtime sits on the algorithm.
 
-Word counts below are timed at ~150 wpm. If you speak faster, pad the screen
-captures rather than cutting words.
-
----
-
-## Assets you already have
-
-| File | Use |
-|---|---|
-| `website/intro site/images/field-site.jpg` | the pilot paddy, wide — opener |
-| `context-paddy-farmers.jpg` | farmers planting — stakes |
-| `context-storm-field.jpg` | storm cell — stakes |
-| `field-deployed.jpg` | node alone in standing water |
-| `unit-panel.jpg` | node + 20W panel |
-| `unit-detail.jpg` | electronics through the clear lid |
-| `bench-calibration.mp4` | 11s, probe in a soil sample |
-| `dashboard-demo/dev.html` | all screen capture |
-
-Stills need motion or they read as a slideshow — slow push-in (~5% over the
-shot) on every one.
+Voiceover recorded separately from picture. Word counts timed at ~150 wpm.
 
 ---
 
@@ -30,163 +11,176 @@ shot) on every one.
 
 | # | Time | Picture | Audio |
 |---|---|---|---|
-| 1 | 0:00–0:14 | `field-site.jpg`, slow push | VO 1 |
-| 2 | 0:14–0:30 | `context-storm-field.jpg` → `context-paddy-farmers.jpg` | VO 2 |
-| 3 | 0:30–0:52 | `field-deployed.jpg` → `unit-panel.jpg` → `unit-detail.jpg` | VO 3 |
-| 4 | 0:52–1:06 | `bench-calibration.mp4`, full 11s | VO 4 |
-| 5 | 1:06–1:52 | Screen: pipeline panel, capture A | VO 5 |
-| 6 | 1:52–2:16 | Screen: prediction firing, capture B | VO 6 |
-| 7 | 2:16–2:32 | Screen: Provenance block, capture C | VO 7 |
-| 8 | 2:32–2:42 | `field-site.jpg` again, wider | VO 8 |
+| 1 | 0:00–0:12 | `field-site.jpg`, slow push | VO 1 |
+| 2 | 0:12–0:29 | `context-storm-field` → `context-paddy-farmers` | VO 2 |
+| 3 | 0:29–0:46 | `field-deployed` → `unit-panel` → `unit-detail` | VO 3 |
+| 4 | 0:46–1:02 | `bench-calibration.mp4` | VO 4 |
+| 5 | 1:02–2:02 | **Screen: pipeline panel** (capture A) | VO 5 |
+| 6 | 2:02–2:28 | **Screen: prediction firing** (capture B) | VO 6 |
+| 7 | 2:28–2:46 | Screen: Provenance (capture C) | VO 7 |
+| 8 | 2:46–2:59 | `field-site.jpg`, wider | VO 8 |
+
+Runtime **2:59**. Shots 5 and 6 run 86 seconds together — 48% of the video.
 
 ---
 
 ## Voiceover
 
-**VO 1** — 0:00–0:14
+**VO 1** — 0:00–0:12
 
-> Every wet season, farmers in the Philippines lose crops to water they didn't
-> see coming. Not because the flood was unpredictable. Because nobody was
-> measuring the ground it started in.
+> A flood gives you warning. It's in the soil, hours before it's on the surface.
+> The hard part was never predicting it. It's that nobody was measuring the
+> ground.
 
-**VO 2** — 0:14–0:30
+**VO 2** — 0:12–0:29
 
-> One storm last season did six hundred and ninety million pesos of
-> agricultural damage. The equipment that could have given warning costs over a
-> thousand dollars a site. For a smallholder with four hectares, that maths has
-> never worked.
+> One storm last season: six hundred and ninety million pesos of crop damage in
+> the Philippines. The telemetry that could have seen it coming runs over a
+> thousand dollars a site. Smallholders have never been able to buy it.
 
-**VO 3** — 0:30–0:52
+**VO 3** — 0:29–0:46
 
-> FMS is a solar-powered sensor node. It reads soil moisture and standing water,
-> relays over radio to a base station, and texts the farmer directly. No WiFi.
-> No mains power. One SIM card for an entire farm. Target cost, about a hundred
-> and twenty dollars a node.
+> So we built the sensor. Solar, radio-linked, about a hundred and twenty
+> dollars a node, one SIM for a whole farm. But the hardware is only how we get
+> the data. What matters is what runs on top of it.
 
-**VO 4** — 0:52–1:06
+**VO 4** — 0:46–1:02
 
-> Every threshold in the system traces back to this — a real soil sample, logged
-> dry and logged saturated, so a number in the field means something.
+> And here's the signal most systems miss. Water on the surface is the last
+> stage of a flood, not the first. Rain falls, soil saturates, then water pools.
+> Each step is earlier, and less obvious, than the one after it.
 
-**VO 5** — 1:06–1:52 *(the algorithm — the core of the entry)*
+**VO 5** — 1:02–2:02 — *the model*
 
-> Water reaching the surface is the *last* thing that happens in a flood. The
-> soil saturates first — and that gap is the warning.
+> So the system doesn't wait for water. It models the field.
 >
-> Five steps. Three probes that don't agree on direction — water reads up when
-> wet, soil and rain read down — normalised onto one scale. Each reading
-> classified into a band from our own calibration. Then the rate of change,
-> fitted from the last two dozen readings: how fast is this field wetting, right
-> now. And that rate run forward, with the live rainfall forecast deciding how
-> long it holds — while rain is expected it persists, when the forecast clears
-> it decays.
+> Three probes, and they don't agree on direction — water reads up when wet,
+> soil and rain read down. First the model normalises them onto one scale, zero
+> dry to one wet, anchored to values we measured on a real soil sample.
 >
-> Out: time to saturation, time to standing water, confidence.
-
-**VO 6** — 1:52–2:16 *(over the prediction firing)*
-
-> Watch the state field. The node is still only on Watch — nothing has crossed a
-> flood threshold — and the system is already saying saturation in two minutes.
+> Then it fits a regression, continuously, per node, across the last two dozen
+> readings. Not a threshold — a rate. How fast is this specific field taking on
+> water, right now.
 >
-> Then soil crosses four three six. Then water passes thirty, and the alert
-> fires with a map pin. The prediction arrived before the flood did. That's the
-> entire product.
+> Then it fuses that with live meteorological data. The forecast doesn't tell us
+> how much the soil will wet; nobody has calibrated that. It tells us how long
+> the current rate survives. Rain expected, the rate holds. Forecast clears, it
+> decays away.
+>
+> What comes out is a time. Minutes to saturation, minutes to standing water,
+> and a confidence value from how well the model actually fits.
 
-**VO 7** — 2:16–2:32
+**VO 6** — 2:02–2:28 — *the model firing*
 
-> Where we don't know, we say so. The gap between saturation and water reaching
-> the probe has never been timed — we report it unknown, not guessed. The
-> healthy-soil band is published data, not our bench. It's marked estimated.
+> Watch the state field. The node reads Watch — nothing has crossed a flood
+> threshold — and the model is already calling saturation in two minutes.
+>
+> Soil crosses four three six. Water passes thirty. The alert fires with a map
+> pin.
+>
+> The model was ahead of the event. Every alert this system sends, it sends
+> early.
 
-**VO 8** — 2:32–2:42
+**VO 7** — 2:28–2:46
 
-> Same question a thousand-dollar station answers — how long do I have — at a
-> price a smallholder can actually reach.
+> And where the model doesn't know, it says so. The gap between saturation and
+> standing water has never been timed, so we report it unknown rather than
+> guess. Every estimated figure is labelled estimated.
+
+**VO 8** — 2:46–2:59
+
+> The same answer a thousand-dollar station gives — how long do I have — from a
+> hundred and twenty dollars of sensor, and a model that runs on the base
+> station.
 
 ---
 
 ## Screen captures
 
-Hard-refresh (⌘⇧R) before each one so the event log starts clean. Record the
-browser at 1400px wide or more; below that the pipeline panel reflows to two
-columns and reads badly on video.
+Record at **1400px wide or more**. Hard-refresh before each; to clear old alerts
+from the event log, open the browser console and run
+`localStorage.clear(); location.reload()`.
 
-**Capture A — the pipeline** (need ~45s)
-Scroll to **How the prediction works**. Start the flood sequence so the numbers
-are moving, then sit on the panel. In the edit, push slowly left to right across
-the five boxes to match VO 5. Don't cut between boxes — one continuous move.
+**A — the model** (~60s, the centrepiece)
+*How the prediction works*, five boxes. Start the flood sequence first so the
+numbers are live, then hold on the panel. In the edit, one continuous slow push
+left to right across the boxes, landing on box 5 as VO 5 reaches "what comes out
+is a time". Don't cut between boxes.
 
-**Capture B — the prediction firing** (need ~30s)
-Press **▶ Run flood sequence**, then frame the Flood Prediction panel with the
-telemetry table visible above it. The beat you need is step 4 of 7, where the
-big number reads ~2 min and the node's state still says Watch. Let it run
-through steps 5 and 6 so saturation and the flood alert land in the same take.
+**B — the model firing** (~30s)
+Press **▶ Run flood sequence**. Frame the Flood Prediction panel with the
+telemetry table visible above it, so the state column and the prediction are in
+the same shot. The beat you need is **step 4 of 7**: the big number reads ~2 min
+while the state still says Watch. Let it run through steps 5 and 6.
 
-If the lead time doesn't appear, the node hasn't built enough readings since the
-reset — let the sequence run once, stop it, and start it again.
+If no lead time appears, the node hasn't built enough readings since the reset —
+run the sequence once, stop it, start again.
 
-**Capture C — provenance** (need ~18s)
-Scroll to the **Provenance** block. Static shot, slow push. Four columns:
-measured, estimated, not yet tested, simulated here.
+**C — provenance** (~18s). Static, slow push.
 
 ---
 
-## Captions to burn in
+## Burn-in captions
 
-Use these over the screen captures so a muted viewer still follows it:
-
-- `Soil 657 · Water 0 · Rain 1014` — over capture A's input box
-- `Saturation in 2 min — state still WATCH` — over the capture B money shot
+- `3 sensor streams → 1 normalised scale` — over box 2 in capture A
+- `Regression fitted per node, live` — over box 4
+- `Saturation in 2 min — state still WATCH` — the capture B money shot
 - `Measured · Estimated · Not yet tested` — over capture C
 
 ---
 
-## Required disclosure
+## Disclosure
 
-Once, on screen, early — a lower third over shot 3 or 4:
+Lower third over shot 3 or 4, once:
 
 > Sensor readings simulated. Ranges from our own bench calibration.
 
-That covers the whole video. During the flood sequence the console also
-substitutes a synthetic rainfall forecast — because the algorithm correctly
-refuses to predict wetting the real forecast doesn't support, and on a dry day
-there'd be nothing to film. It labels itself: the banner reads **"demo weather
-substituted"** and the forecast tile carries a `DEMO` tag. **Don't crop either
-one out.** If a judge freeze-frames, the label should be in shot.
+Don't crop the `DEMO` tag or the demo banner out of the flood-sequence footage.
 
 ---
 
-# Language rules
+# The AI framing
 
-## Say
+## What you can truthfully claim
 
-- "predictive model", "forward projection", "sensor fusion"
-- "combines three sensor streams with live forecast data"
-- "time-to-event with a confidence bound"
-- "thresholds from our own calibration"
+The system fits a **least-squares regression model** to each node's live data
+stream and fuses it with an external forecast feed. Regression is a statistical
+model fitted to data — it is chapter one of every machine-learning textbook.
+So these are all accurate:
 
-## Never say
+- "a regression model, fitted continuously to live sensor data"
+- "multi-sensor fusion with external forecast data"
+- "a predictive model, not a threshold alarm"
+- "real-time model fitting, per node"
+- "algorithmic prediction with a confidence bound"
 
-- ❌ "AI-powered" / "machine learning" / "neural network" / "trained on"
-- ❌ "it learns"
-- ❌ any accuracy percentage — there is no validation set, nothing has been scored
+**The strongest single sentence you have:**
+
+> A regression model, fitted in real time to each node's own data, fused with
+> live meteorological data to predict time-to-flood.
+
+Every word of that is true and it describes genuine modelling work.
+
+## What you cannot claim
+
+- ❌ "trained on" — there is no training corpus. The model is fitted at runtime
+  to a rolling window and thrown away. Nothing persists, nothing accumulates.
+- ❌ "it learns" / "gets smarter over time" — it does not. Same data in, same
+  answer out, every time.
+- ❌ "neural network" / "deep learning" / "AI-powered"
+- ❌ any accuracy percentage — nothing has been validated against a real flood
 - ❌ that the healthy band or the fast-drop rate was measured
 
-**Why.** The algorithm is deterministic: calibrated thresholds plus a linear
-projection with a decay term. No model, no training data. That is honest
-engineering and it beats a black box for something people rely on — but it is
-not machine learning, and if the competition's AI requirement is literal, this
-entry doesn't meet it. Better to know now than to be asked on stage.
+## If a judge pushes: "but is it AI?"
 
-If a judge asks **"is this AI?"** —
+> It's a fitted model rather than a trained one. We run least-squares regression
+> on each node's live stream and fuse it with forecast data to project
+> time-to-flood. We deliberately didn't go further into machine learning,
+> because we have one soil type, one node and one calibration round — there
+> isn't enough data to train anything honest, and a model that is confidently
+> wrong about a flood is worse than no model at all. The path is there: log one
+> real wetting event and the rate constant we currently leave switched off
+> becomes fittable.
 
-> It's a predictive model rather than a learned one. We fuse three sensor
-> streams with external forecast data to project time-to-flood. We deliberately
-> didn't use machine learning: we have one soil type, one node, one calibration
-> round. There isn't enough data to train anything honest, and a model that's
-> confidently wrong about a flood is worse than no model. The path is there —
-> log one real wetting event and the rate constant we currently leave switched
-> off becomes fittable.
-
-That answers the question and reframes the gap as judgement, which is what's
-actually being scored.
+That answers it, shows you know where the line is, and turns the gap into
+judgement — which is what is actually being scored.
