@@ -256,6 +256,36 @@
   .cs i.b-unk{color:var(--muted);}
   .cs-arrow{color:var(--muted); font-size:10px;}
 
+  /* Live pipeline view: the five stages with this node's real numbers in
+     them, so it can be pointed at on camera instead of narrated blind. */
+  .algo-flow{display:grid; grid-template-columns:1fr auto 1fr auto 1fr auto 1fr auto 1fr; gap:10px; align-items:stretch;}
+  @media (max-width:1100px){
+    .algo-flow{grid-template-columns:1fr 1fr; }
+    .algo-flow .algo-arrow{display:none;}
+  }
+  .algo-col{display:flex; flex-direction:column; min-width:0;}
+  .ac-h{font-size:9.5px; text-transform:uppercase; letter-spacing:.7px; font-weight:600; color:var(--muted); margin-bottom:7px;}
+  .ac-box{
+    flex:1; border:1px solid var(--card-border); border-radius:var(--radius-sm);
+    background:var(--bg-soft); padding:10px 11px; font-family:var(--mono);
+    font-size:10.5px; line-height:1.75; color:var(--ink-soft); min-width:0;
+  }
+  .ac-box b{color:var(--ink); font-weight:600;}
+  .ac-box .hi{color:var(--water);} .ac-box .warn{color:var(--amber);} .ac-box .bad{color:var(--red);} .ac-box .ok{color:var(--green);}
+  .ac-box .dim{color:var(--muted); font-size:9.5px;}
+  .algo-arrow{display:flex; align-items:center; color:var(--muted); font-size:13px; padding-top:18px;}
+
+  /* Demo sequence banner */
+  .demo-banner{
+    display:flex; align-items:center; gap:12px; margin:-8px 0 18px;
+    background:var(--red-bg); border:1px solid var(--red); border-radius:var(--radius);
+    padding:9px 12px; font-size:12px; color:var(--ink);
+  }
+  .demo-banner .db-step{font-family:var(--mono); font-size:10.5px; font-weight:600; color:var(--red); background:var(--card); border-radius:var(--radius-sm); padding:3px 7px;}
+  .demo-banner .db-text{flex:1; font-weight:500;}
+  .demo-banner .db-note{font-family:var(--mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.5px; color:var(--amber);}
+  .demo-banner .db-stop{background:transparent; border:1px solid var(--red); color:var(--red); border-radius:var(--radius-sm); padding:4px 10px; font-size:11px; font-weight:600; cursor:pointer; font-family:inherit;}
+
   /* Provenance: what is measured, estimated, untested, invented. The brief is
      explicit that estimated values must never read as test results. */
   .prov{display:grid; grid-template-columns:repeat(4,1fr); gap:22px;}
@@ -415,6 +445,7 @@
     <button data-speed="15">15×</button>
     <button data-speed="40">40×</button>
     <span class="spacer"></span>
+    <button class="danger" id="run-demo">▶ Run flood sequence</button>
     <button class="danger" id="trigger-flood">Trigger flood · East Canal</button>
     <button class="info" id="trigger-storm">Trigger storm · rain gauge</button>
     <button class="info" id="run-diagnostic" style="background:var(--water); border-color:var(--water);">Run fleet diagnostic</button>
@@ -462,6 +493,36 @@
       </div>
       <div id="predict-body">
         <div class="predict-empty">Select a node to project its soil and water trend forward and cross-check it against the live regional forecast.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title"><h2>How the prediction works</h2><span id="algo-node">—</span></div>
+  <div class="panel algo" id="algo-panel">
+    <div class="algo-flow">
+      <div class="algo-col">
+        <div class="ac-h">1 · Inputs</div>
+        <div class="ac-box" id="algo-in"></div>
+      </div>
+      <div class="algo-arrow">→</div>
+      <div class="algo-col">
+        <div class="ac-h">2 · Normalise</div>
+        <div class="ac-box" id="algo-norm"></div>
+      </div>
+      <div class="algo-arrow">→</div>
+      <div class="algo-col">
+        <div class="ac-h">3 · Classify</div>
+        <div class="ac-box" id="algo-class"></div>
+      </div>
+      <div class="algo-arrow">→</div>
+      <div class="algo-col">
+        <div class="ac-h">4 · Project</div>
+        <div class="ac-box" id="algo-proj"></div>
+      </div>
+      <div class="algo-arrow">→</div>
+      <div class="algo-col">
+        <div class="ac-h">5 · Output</div>
+        <div class="ac-box" id="algo-out"></div>
       </div>
     </div>
   </div>
@@ -1449,10 +1510,25 @@ function etaToThreshold(now, threshold, slopePerMs, rising){
   return ms / 60000;
 }
 
+/* A step change in the series is not a trend, but a least-squares fit cannot
+   tell the difference — it reads the jump as a steep slope and keeps doing so
+   until the discontinuity leaves the window. Real causes: a node restored
+   after a failure, a scenario reset, a probe pulled and replaced. The brief
+   puts inter-reading wobble around 5% (~25 ADC), so anything past 80 ADC in
+   one interval is not soil moving; fit only what came after it. */
+const PREDICT_JUMP_ADC = 80;
+
+function trimAtDiscontinuity(hist){
+  for (let i=hist.length-1; i>0; i--){
+    if (Math.abs(hist[i].soil - hist[i-1].soil) > PREDICT_JUMP_ADC) return hist.slice(i);
+  }
+  return hist;
+}
+
 function predictNode(node){
-  const hist = node.history.slice(-PREDICT_WINDOW);
+  const hist = trimAtDiscontinuity(node.history.slice(-PREDICT_WINDOW));
   if (hist.length < PREDICT_MIN_POINTS){
-    return {ok:false, reason:`Only ${hist.length} reading${hist.length===1?"":"s"} so far — need ${PREDICT_MIN_POINTS} before projecting.`};
+    return {ok:false, reason:`Only ${hist.length} reading${hist.length===1?"":"s"} since the last step change — need ${PREDICT_MIN_POINTS} before projecting.`};
   }
   const t0 = hist[0].t;
   const soilFit  = linFit(hist.map(h=>({x:h.t-t0, y:h.soil})));
@@ -1567,7 +1643,7 @@ function floodForecast(node, p, data){
     } else {
       vSoil *= Math.exp(-FC_STEP_MIN/FC_DRY_DECAY_TAU_MIN);   // shower ending
     }
-    soil = Math.max(SOIL_FLOOR, soil + vSoil*FC_STEP_MIN);
+    soil = Math.min(SOIL_CEIL, Math.max(SOIL_FLOOR, soil + vSoil*FC_STEP_MIN));
     if (satAt === null && soil <= SOIL_FLOOD_THRESHOLD) satAt = t;
 
     if (vWater > 0.2){                            // already rising: project it
@@ -1671,6 +1747,7 @@ function renderPrediction(){
     sub.textContent = "Pick a marker on the map, or a node below.";
     body.innerHTML = `<div class="predict-empty">Select a node to project its soil and water trend forward and cross-check it against the live regional forecast.</div>`;
     if (predictChart){ predictChart.destroy(); predictChart = null; }
+    renderAlgoPanel(null);
     return;
   }
 
@@ -1691,7 +1768,7 @@ function renderPrediction(){
 
   const a = assessLevel(node);
   const zone = soilZone(p.last.soil);
-  const f = floodForecast(node, p, weatherCache ? weatherCache.data : null);
+  const f = floodForecast(node, p, demoWeather || (weatherCache ? weatherCache.data : null));
   p.forecast = f;
 
   const LEVEL_CLS = {0:"calm", 1:"watch", 2:"urgent", 3:"urgent"};
@@ -1741,7 +1818,7 @@ function renderPrediction(){
       <div class="pm"><div class="k">Saturation</div><div class="v">${fmtEta(f.satAt)}</div><div class="s">to ${SOIL_FLOOD_THRESHOLD}</div></div>
       <div class="pm"><div class="k">Flood</div><div class="v">${fmtEta(f.floodEta)}</div><div class="s">water &gt;${WATER_FLOOD_THRESHOLD}</div></div>
       <div class="pm"><div class="k">Zone</div><div class="v" style="font-size:10.5px;">${zone.short}${zone.est?' <span class="est">est</span>':''}</div></div>
-      <div class="pm"><div class="k">Rain fcst</div><div class="v">${f.fc.h6===null?"—":f.fc.h6+"mm"}</div><div class="s">6h${f.fc.h12===null?"":` · ${f.fc.h12}mm 12h`}</div></div>
+      <div class="pm"><div class="k">Rain fcst${demoWeather?' <span class="est">demo</span>':''}</div><div class="v">${f.fc.h6===null?"—":f.fc.h6+"mm"}</div><div class="s">${demoWeather?"simulated":"6h"}${f.fc.h12===null?"":` · ${f.fc.h12}mm 12h`}</div></div>
     </div>
     <div class="cascade">${f.stages.map(st=>{
       const reached = st.eta === 0;
@@ -1752,7 +1829,53 @@ function renderPrediction(){
     }).join('<span class="cs-arrow">→</span>')}</div>
     <div class="predict-chart-box"><canvas id="predict-chart"></canvas></div>`;
 
+  renderAlgoPanel(node, p, f, a);
   drawPredictChart(p);
+}
+
+/* Live pipeline view. Every figure shown is the same value the prediction
+   actually used on this tick — nothing here is re-derived for display. */
+function renderAlgoPanel(node, p, f, a){
+  const set = (id, html)=>{ const el=document.getElementById(id); if (el) el.innerHTML = html; };
+  const nameEl = document.getElementById("algo-node");
+  if (nameEl) nameEl.textContent = node ? `live · ${node.name}` : "—";
+
+  if (!node || !p || !p.ok){
+    ["algo-in","algo-norm","algo-class","algo-proj","algo-out"].forEach(id=>set(id,'<span class="dim">select a node</span>'));
+    return;
+  }
+  const zone = soilZone(p.last.soil);
+  const raining = rainNode.raw < RAIN_THRESHOLD;
+
+  set("algo-in", `
+    soil <b>${p.last.soil}</b> <span class="dim">adc</span><br>
+    water <b>${p.last.water}</b> <span class="dim">adc</span><br>
+    rain <b>${rainNode.raw}</b> <span class="dim">adc</span><br>
+    <span class="dim">fcst ${f.fc.h6===null?"—":f.fc.h6+"mm/6h"}</span>${demoWeather?' <span class="est">demo</span>':''}`);
+
+  set("algo-norm", `
+    <span class="dim">0 = dry, 1 = wet</span><br>
+    soil <b class="hi">${soilWet(p.last.soil).toFixed(2)}</b><br>
+    water <b class="hi">${waterWet(p.last.water).toFixed(2)}</b><br>
+    rain <b class="hi">${rainWet(rainNode.raw).toFixed(2)}</b>`);
+
+  set("algo-class", `
+    zone <b class="${zone.cls==="good"?"ok":zone.cls==="warn"?"warn":"bad"}">${zone.short}</b><br>
+    rain <b class="${raining?"warn":""}">${raining?"wet":"dry"}</b><br>
+    water <b class="${p.last.water>WATER_FLOOD_THRESHOLD?"bad":""}">${p.last.water>WATER_FLOOD_THRESHOLD?"contact":"none"}</b><br>
+    → <b class="${a.level>=2?"bad":a.level===1?"warn":"ok"}">L${a.level}</b>`);
+
+  set("algo-proj", `
+    v<sub>soil</sub> <b>${p.soilPerMin>=0?"+":""}${p.soilPerMin.toFixed(1)}</b> <span class="dim">/min</span><br>
+    v<sub>water</sub> <b>${p.waterPerMin>=0?"+":""}${p.waterPerMin.toFixed(1)}</b> <span class="dim">/min</span><br>
+    <span class="dim">rate holds while wet,</span><br>
+    <span class="dim">decays τ=${FC_DRY_DECAY_TAU_MIN}min after</span>`);
+
+  set("algo-out", `
+    sat <b class="${f.satAt!==null?"warn":""}">${fmtEta(f.satAt)}</b><br>
+    flood <b class="${f.floodEta!==null?"bad":""}">${fmtEta(f.floodEta)}</b><br>
+    conf <b>${f.confidence.label}</b><br>
+    <span class="dim">r²=${p.r2.toFixed(2)}</span>`);
 }
 
 function drawPredictChart(p){
@@ -1991,14 +2114,100 @@ function tick(){
 }
 
 /* ---- controls ---- */
+function setSpeed(mult){
+  speedMult = Number(mult);
+  document.querySelectorAll(".controls-bar button[data-speed]").forEach(b=>
+    b.classList.toggle("active", Number(b.dataset.speed) === speedMult));
+}
 document.querySelectorAll(".controls-bar button[data-speed]").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    speedMult = Number(btn.dataset.speed);
-    document.querySelectorAll(".controls-bar button[data-speed]").forEach(b=>b.classList.remove("active"));
-    btn.classList.add("active");
-  });
+  btn.addEventListener("click", ()=>setSpeed(btn.dataset.speed));
 });
 document.getElementById("trigger-flood").addEventListener("click", ()=>{ nodes.find(n=>n.id==="2").scenarioTick = 6; });
+
+/* =========================================================================
+   DEMO SEQUENCE — a fixed, repeatable run through the brief's cascade so a
+   recording hits the same beats every take. It drives the scenario clock
+   rather than writing readings directly, so the pipeline being demonstrated
+   is the real one: same thresholds, same debounce, same prediction.
+   ========================================================================= */
+const DEMO_STEPS = [
+  {at:0,   label:"Baseline — all fields normal",        run(){ demoReset(); }},
+  {at:6,   label:"Rain begins — gauge drops below 980", run(){ rainNode.scenarioTick = 0; }},
+  {at:16,  label:"Soil wetting — East Canal enters the watch band", run(){ nodes.find(n=>n.id==="2").scenarioTick = 10; }},
+  {at:30,  label:"Prediction: saturation projected ahead of the event", run(){ selectNode("2"); }},
+  {at:46,  label:"Saturation reached — soil at or below 436",  run(){ nodes.find(n=>n.id==="2").scenarioTick = 26; }},
+  {at:62,  label:"Standing water — flood confirmed, SMS fires", run(){ nodes.find(n=>n.id==="2").scenarioTick = 32; }},
+  {at:82,  label:"Draining — alert clears through hysteresis", run(){ nodes.find(n=>n.id==="2").scenarioTick = 52; }},
+];
+let demoTimer = null, demoT = 0;
+
+/* The projection leans on the live forecast, so on a dry real-world day it
+   correctly refuses to predict wetting that is not coming — which is right,
+   but leaves a recording with no lead time to show. While the sequence runs
+   it substitutes a synthetic forecast. That is the ONLY substituted input,
+   and the UI is marked "demo weather" throughout so it can never be mistaken
+   for the live Open-Meteo feed. */
+let demoWeather = null;
+function makeDemoWeather(){
+  const now = new Date(), times = [], prec = [];
+  for (let i=0;i<12;i++){
+    times.push(new Date(now.getTime()+i*3600e3).toISOString().slice(0,13));
+    prec.push(i < 5 ? 6 : 0);        // five wet hours, then clearing
+  }
+  return {current:{time:times[0], precipitation:6, temperature_2m:27, relative_humidity_2m:92, weather_code:65},
+          hourly:{time:times, precipitation:prec}};
+}
+
+function demoReset(){
+  nodes.forEach(n=>{ n.failed=false; n.failReason=null; n.state="NORMAL"; n.overCount=0; n.underCount=0; });
+  const e = nodes.find(n=>n.id==="2");
+  e.soil = 780; e.water = 0; e.scenarioTick = 0;
+  rainNode.raw = 1015; rainNode.scenarioTick = 40;
+  lastSmsSimTime = 0;
+}
+
+function setDemoBanner(text, step, total){
+  let el = document.getElementById("demo-banner");
+  if (!text){ if (el) el.remove(); return; }
+  if (!el){
+    el = document.createElement("div");
+    el.id = "demo-banner"; el.className = "demo-banner";
+    document.querySelector(".controls-bar").insertAdjacentElement("afterend", el);
+  }
+  el.innerHTML = `<span class="db-step">${step}/${total}</span><span class="db-text">${text}</span>
+    <span class="db-note">demo weather substituted</span>
+    <button class="db-stop" id="demo-stop">Stop</button>`;
+  document.getElementById("demo-stop").addEventListener("click", stopDemo);
+}
+
+function stopDemo(){
+  if (demoTimer) clearInterval(demoTimer);
+  demoTimer = null; demoT = 0; demoWeather = null;
+  setDemoBanner(null);
+  document.getElementById("run-demo").textContent = "▶ Run flood sequence";
+}
+
+function startDemo(){
+  if (demoTimer){ stopDemo(); return; }
+  setSpeed(4);                       // 4x keeps the whole run near 90s of tape
+  demoWeather = makeDemoWeather();
+  demoT = 0;
+  document.getElementById("run-demo").textContent = "■ Stop sequence";
+  const last = DEMO_STEPS[DEMO_STEPS.length-1].at + 14;
+  const tick = ()=>{
+    const due = DEMO_STEPS.filter(s=>s.at === demoT);
+    due.forEach(s=>{
+      s.run();
+      setDemoBanner(s.label, DEMO_STEPS.indexOf(s)+1, DEMO_STEPS.length);
+      logLine(`DEMO ${s.label}`, "state");
+    });
+    demoT++;
+    if (demoT > last) stopDemo();
+  };
+  tick();
+  demoTimer = setInterval(tick, 1000);
+}
+document.getElementById("run-demo").addEventListener("click", startDemo);
 document.getElementById("trigger-storm").addEventListener("click", ()=>{ rainNode.scenarioTick = 0; });
 
 document.getElementById("theme-toggle").addEventListener("click", ()=>{
