@@ -1,14 +1,21 @@
-# FMS demo script — 3:45
+# FMS demo script — 4:09
 
-Screen recording. Console `localhost:8766/dev.html`, forecast page via the
-header link. Record at 1400px or wider.
+Screen recording. Console `localhost:8766/dev.html`; forecast page reached via
+the header link. Record at 1400px or wider.
 
 Before recording, clear old alerts: browser console →
 `localStorage.clear(); location.reload()`
 
+**If your cap is 3:00** — cut Shot 2 (the cascade strip) and Beat 2 (the
+regional band). That loses 53 seconds and nothing structural: the thresholds
+resurface in Shot 4, and the 39.6mm figure is legible on screen without
+narration. Result is 3:16.
+
 ---
 
-## Shot 1 — Console, top of page · 0:00–0:49
+# PART ONE — the console
+
+## Shot 1 · 0:00–0:49 — Top of page
 
 Flood Prediction is already the first section. No scrolling.
 
@@ -27,9 +34,7 @@ Flood Prediction is already the first section. No scrolling.
 
 **Do:** click between the three node chips so the panel visibly updates.
 
----
-
-## Shot 2 — The cascade strip · 0:49–1:30
+## Shot 2 · 0:49–1:30 — The cascade strip
 
 Stay put. Point at the four chips under the metrics.
 
@@ -47,16 +52,14 @@ Stay put. Point at the four chips under the metrics.
 > An alert needs three consecutive readings to commit, and clears through a
 > separate hysteresis band at 470, so the state can't oscillate.
 
----
-
-## Shot 3 — Advisory Layer · 1:30–2:07
+## Shot 3 · 1:30–2:07 — Advisory Layer
 
 Scroll down one section.
 
 > This is what the reading becomes for the farmer.
 >
-> The firmware's raw alert is underneath: soil 455, water 75. That's a number
-> dump — no use to someone standing in a field.
+> The firmware's raw alert is underneath: soil 455, water 75. A number dump — no
+> use to someone standing in a field.
 >
 > The advisory layer turns it into an instruction. Which block, what's
 > happening, how long they have.
@@ -66,9 +69,7 @@ Scroll down one section.
 > disagreement is diagnostic: soil wetting with no rain forecast is usually
 > irrigation, drainage, or a failing probe.
 
----
-
-## Shot 4 — How the prediction works · 2:07–3:07
+## Shot 4 · 2:07–3:07 — How the prediction works
 
 Scroll to the five-box panel. One slow pass left to right.
 
@@ -93,30 +94,75 @@ Scroll to the five-box panel. One slow pass left to right.
 
 ---
 
-## Shot 5 — Field Forecast · 3:07–3:45
+# PART TWO — the forecast page
 
-Click **Field Forecast →** in the header. Let it load. Press **Simulate storm**.
+**Getting there:** click `Field Forecast →` in the console header — cyan, top
+right, beside the clock. Let it settle ~2s; cards appear immediately, the
+rainfall bars fill in when the weather lands. Then press `Simulate storm`
+(header, left of the Dev console link). Everything below assumes storm mode on.
 
-> The same model applied per field.
->
-> Regional weather is live. But a regional forecast gives every farm in the
-> province the same number — and that's the gap.
->
-> Under forty millimetres of rain: north block holds, it starts healthy with
-> good drainage. Riverside absorbs it, it's drying out and sandy. Canal side
-> reaches standing water in two hours — already wetter than ideal, and it drains
-> poorly.
->
+## Beat 1 · 3:07–3:15 — Whole page
+
+Don't point at anything. Let it land.
+
+> The same model, applied per field.
+
+## Beat 2 · 3:15–3:27 — Regional band
+
+Point at `Next 12h — 39.6mm` on the right of the wide top card.
+
+> Regional weather across the top — nearly forty millimetres forecast over
+> twelve hours. But a regional forecast gives every farm in the province this
+> same number.
+
+## Beat 3 · 3:27–3:37 — First card, North Rice Paddy
+
+Point at the badge `Heavy rain, ground holding`, then down to
+`Soil now 661 · Healthy · Water 0`.
+
+> North block holds. It starts healthy at 661 and drains well, so forty
+> millimetres goes straight through it.
+
+## Beat 4 · 3:37–3:51 — Middle card, East Canal Field
+
+Point at `Flood likely`, then the big `2.0 h`, then
+`Soil now 469 · Wetter than ideal · Water 12`.
+
+> Canal side reaches standing water in two hours. Same rain — but it's already
+> wetter than ideal at 469, there's water on the probe, and it drains poorly.
+
+**Your strongest moment. Hold a beat longer than feels natural.**
+
+## Beat 5 · 3:51–3:58 — Third card, Riverside Plot
+
+Point at `Soil now 821 · Drying out`.
+
+> Riverside absorbs it. It's drying out at 821 and it's sandy.
+
+## Beat 6 · 3:58–4:09 — Pull back across all three
+
+Widen to all three cards. Sweep across the three outlook badges if you can.
+
 > Same sky. Three different answers. That's what putting probes in the ground
 > gets you that reading a forecast never will.
 
 ---
 
+## While recording
+
+- The `reading Xs ago` line under each field name counts up every second. Keep
+  it in frame — it's what makes the page read as live rather than a screenshot.
+- East Canal's soil drifts on its own. On a long take it will have moved off
+  469, so read the number off the screen rather than the script.
+- The section header says `REGIONAL simulated` in storm mode. Leave it visible.
+  If asked: the storm profile is substituted so the divergence is visible; the
+  ground data and the model are untouched.
+
 ## Notes
 
-**The disclosure line** is in shot 1 and takes about four seconds. Say it once
-and never again — a judge who notices the `DEMO` tag later has already been
-told, which is very different from catching you.
+**Disclosure** is four seconds in Shot 1. Say it once, never again. A judge who
+notices the `DEMO` tag later has already been told — very different from
+catching you.
 
 **Technical terms used, all accurate:** 10-bit ADC, raw counts, 433MHz, mean
 plus two standard deviations, consecutive-reading debounce, hysteresis band,
