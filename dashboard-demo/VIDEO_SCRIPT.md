@@ -189,7 +189,7 @@ percentage · that the healthy band (552–699) or the fast-drop rate was measur
 # ALTERNATIVE — Field Forecast as one continuous block
 
 Use this instead of Beats 1–6 if you'd rather narrate the forecast page in a
-single unbroken take. Runs about 1:05. Show the page, press `Simulate storm`,
+single unbroken take. Runs about 1:15. Show the page, press `Simulate storm`,
 then read straight through while slowly panning across the three cards.
 
 > This is the same system looking forward instead of back — one card per field.
