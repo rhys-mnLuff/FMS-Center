@@ -1,4 +1,4 @@
-# FMS demo script — 4:09
+# FMS demo script — 4:13
 
 Screen recording. Console `localhost:8766/dev.html`; forecast page reached via
 the header link. Record at 1400px or wider.
@@ -7,90 +7,90 @@ Before recording, clear old alerts: browser console →
 `localStorage.clear(); location.reload()`
 
 **If your cap is 3:00** — cut Shot 2 (the cascade strip) and Beat 2 (the
-regional band). That loses 53 seconds and nothing structural: the thresholds
+regional band). That loses 62 seconds and nothing structural: the thresholds
 resurface in Shot 4, and the 39.6mm figure is legible on screen without
-narration. Result is 3:16.
+narration. Result is 3:11.
 
 ---
 
 # PART ONE — the console
 
-## Shot 1 · 0:00–0:49 — Top of page
+## Shot 1 · 0:00–0:42 — Top of page
 
 Flood Prediction is already the first section. No scrolling.
 
-> This is the FMS technician console. Readings come from our simulator while the
-> field hardware finishes bring-up — everything downstream of them is the real
-> system.
+> This is the FMS technician console. The telemetry is coming from our simulator
+> while the field deployment finishes — everything downstream of the input is
+> the production pipeline.
 >
-> Three sensor nodes in a rice paddy. Each reads soil moisture and surface water
-> on a 10-bit analog-to-digital converter, so every value you see is a raw count
-> from zero to 1023. They transmit on 433 megahertz radio to one base station,
-> which is the only unit carrying a SIM.
+> Three nodes stream into it. Each one sends two channels, soil and water, as
+> integers from zero to 1023, into a single ingest endpoint.
 >
-> Select a node and you get its forecast. East Canal Field is at level one,
-> Watch. Soil is wetter than ideal, but nothing has crossed a flood threshold —
-> and the model is already projecting saturation in two minutes.
+> Select a node and you get its inference. East Canal Field is at level one,
+> Watch — the classifier has it wetter than ideal, but no threshold has been
+> crossed. And the model is already projecting saturation in two minutes.
 
 **Do:** click between the three node chips so the panel visibly updates.
 
-## Shot 2 · 0:49–1:30 — The cascade strip
+## Shot 2 · 0:42–1:30 — The cascade strip
 
 Stay put. Point at the four chips under the metrics.
 
-> These four stages are the sequence a flood physically follows. Every threshold
-> comes from our own bench calibration.
+> These four stages are the state sequence a flood moves through. Every
+> threshold is derived from our calibration dataset.
 >
-> Rain starts below 980. Soil leaves its healthy band below 552. Saturation is
-> 436 — the mean of our flooded samples plus two standard deviations, so normal
-> sensor scatter can't trip it. Standing water is above 30, on a probe that
-> idles at zero.
+> Rain fires below 980. Soil leaves its healthy band below 552. Saturation is
+> 436 — two standard deviations off the mean of the saturated class, so
+> ordinary variance in the signal can't trip it. Standing water is anything
+> above 30 on a channel whose baseline is zero.
 >
-> Water at the probe is the last thing that happens, not the first. By then the
-> field is already flooding.
+> The water channel is the last state to change, not the first. By the time it
+> fires, the event is already underway.
 >
-> An alert needs three consecutive readings to commit, and clears through a
-> separate hysteresis band at 470, so the state can't oscillate.
+> The state machine needs three consecutive samples to commit a transition, and
+> releases through a separate hysteresis band at 470, so it can't oscillate.
 
-## Shot 3 · 1:30–2:07 — Advisory Layer
+## Shot 3 · 1:30–2:10 — Advisory Layer
 
 Scroll down one section.
 
-> This is what the reading becomes for the farmer.
+> This is what the inference becomes at the output layer.
 >
-> The firmware's raw alert is underneath: soil 455, water 75. A number dump — no
-> use to someone standing in a field.
+> The default alert payload is underneath: soil 455, water 75. Serialised state,
+> no interpretation — useless to the end user.
 >
-> The advisory layer turns it into an instruction. Which block, what's
+> The advisory layer resolves it into an instruction. Which field, what's
 > happening, how long they have.
 >
-> The technician column keeps what the farmer message drops — trend in counts
-> per minute, goodness of fit, and whether ground and forecast disagree. That
-> disagreement is diagnostic: soil wetting with no rain forecast is usually
-> irrigation, drainage, or a failing probe.
+> The technician view retains what that message drops — the trend coefficient,
+> the goodness of fit, and whether the local signal and the external forecast
+> disagree. That disagreement is the diagnostic: a wetting trend with no rain in
+> the forecast is almost always a local cause, not weather.
 
-## Shot 4 · 2:07–3:07 — How the prediction works
+## Shot 4 · 2:10–3:10 — How the prediction works
 
 Scroll to the five-box panel. One slow pass left to right.
 
-> And here's the model, running live.
+> And here's the pipeline, running live.
 >
-> First, normalisation. The three probes don't agree on direction — water reads
-> up when wet, soil and rain read down. All three get mapped onto one scale,
-> zero dry to one wet, anchored to values measured on a real soil sample.
+> Stage one, feature normalisation. The three channels are inverted relative to
+> each other — one scales up with wetness, two scale down. All three are mapped
+> onto a common zero-to-one range, with the bounds taken from the calibration
+> dataset.
 >
-> Second, classification. Each reading lands in a band from that calibration.
+> Stage two, classification. Each sample is assigned a band from that same
+> dataset.
 >
-> Third, the regression. A least-squares fit across the last twenty-four
-> readings, computed continuously and per node. Not a threshold — a rate. How
-> fast is this specific field taking on water right now.
+> Stage three, regression. A least-squares fit over a rolling window of
+> twenty-four samples, recomputed per node on every cycle. Not a threshold — a
+> gradient. How fast is this series moving right now.
 >
-> Fourth, fusion with live meteorological data. The forecast doesn't set how
-> much the soil wets. It sets how long the current rate survives: rain expected,
-> the rate holds; forecast clears, it decays exponentially.
+> Stage four, fusion with an external forecast API. The forecast isn't weighted
+> into the magnitude. It conditions the decay: while rain is in the window the
+> gradient persists, and once it clears the gradient decays exponentially.
 >
-> Output is a time to each threshold, with a confidence value taken from the
-> fit's r-squared.
+> The output is a projected time to each threshold, with confidence taken from
+> the fit's r-squared.
 
 ---
 
@@ -101,50 +101,51 @@ right, beside the clock. Let it settle ~2s; cards appear immediately, the
 rainfall bars fill in when the weather lands. Then press `Simulate storm`
 (header, left of the Dev console link). Everything below assumes storm mode on.
 
-## Beat 1 · 3:07–3:15 — Whole page
+## Beat 1 · 3:10–3:18 — Whole page
 
 Don't point at anything. Let it land.
 
 > The same model, applied per field.
 
-## Beat 2 · 3:15–3:27 — Regional band
+## Beat 2 · 3:18–3:32 — Regional band
 
 Point at `Next 12h — 39.6mm` on the right of the wide top card.
 
-> Regional weather across the top — nearly forty millimetres forecast over
-> twelve hours. But a regional forecast gives every farm in the province this
-> same number.
+> The external feed is across the top — nearly forty millimetres over twelve
+> hours. But that single value is broadcast to every consumer in the region.
+> It has no per-site resolution.
 
-## Beat 3 · 3:27–3:37 — First card, North Rice Paddy
+## Beat 3 · 3:32–3:42 — First card, North Rice Paddy
 
 Point at the badge `Heavy rain, ground holding`, then down to
 `Soil now 661 · Healthy · Water 0`.
 
-> North block holds. It starts healthy at 661 and drains well, so forty
-> millimetres goes straight through it.
+> North block holds. Its series starts at 661, inside the healthy band, with a
+> low retention coefficient — the forty millimetres passes through.
 
-## Beat 4 · 3:37–3:51 — Middle card, East Canal Field
+## Beat 4 · 3:42–3:57 — Middle card, East Canal Field
 
 Point at `Flood likely`, then the big `2.0 h`, then
 `Soil now 469 · Wetter than ideal · Water 12`.
 
-> Canal side reaches standing water in two hours. Same rain — but it's already
-> wetter than ideal at 469, there's water on the probe, and it drains poorly.
+> Canal side crosses the standing-water threshold in two hours. Identical input
+> — but its series starts at 469, already outside the healthy band, the water
+> channel is non-zero, and its retention coefficient is high.
 
 **Your strongest moment. Hold a beat longer than feels natural.**
 
-## Beat 5 · 3:51–3:58 — Third card, Riverside Plot
+## Beat 5 · 3:57–4:04 — Third card, Riverside Plot
 
 Point at `Soil now 821 · Drying out`.
 
-> Riverside absorbs it. It's drying out at 821 and it's sandy.
+> Riverside absorbs it — series at 821, trending dry, low retention.
 
-## Beat 6 · 3:58–4:09 — Pull back across all three
+## Beat 6 · 4:04–4:13 — Pull back across all three
 
 Widen to all three cards. Sweep across the three outlook badges if you can.
 
-> Same sky. Three different answers. That's what putting probes in the ground
-> gets you that reading a forecast never will.
+> One input. Three different outputs. That's what per-site state gives you that
+> a regional feed structurally cannot.
 
 ---
 
@@ -164,10 +165,10 @@ Widen to all three cards. Sweep across the three outlook badges if you can.
 notices the `DEMO` tag later has already been told — very different from
 catching you.
 
-**Technical terms used, all accurate:** 10-bit ADC, raw counts, 433MHz, mean
-plus two standard deviations, consecutive-reading debounce, hysteresis band,
-normalisation, least-squares regression, exponential decay, sensor fusion,
-r-squared.
+**Vocabulary is software-side throughout** — channels, ingest endpoint,
+classifier, state machine, debounce, hysteresis, feature normalisation, rolling
+window, least-squares regression, gradient, exponential decay, external API,
+data fusion, r-squared, payload, output layer. No RF, no ADC, no enclosure.
 
 **If asked whether it's AI:**
 
