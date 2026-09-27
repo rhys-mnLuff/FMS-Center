@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FMS Field Forecast</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f2f4f6; --bg-soft:#e8ebef; --card:#fff; --card-border:#d8dee5;
+    --ink:#101720; --ink-soft:#44505e; --muted:#76838f; --line:#e2e7ec;
+    --green:#0f7a54; --green-bg:#e2f3ec;
+    --amber:#9a6708; --amber-bg:#fbefd8;
+    --red:#b3392c; --red-bg:#fae5e2;
+    --water:#1f5f96; --water-bg:#e3edf6;
+    --purple:#5b48a8; --purple-bg:#eae7f6;
+    --radius:8px; --radius-sm:5px;
+    --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0d1117; --bg-soft:#161c24; --card:#141a21; --card-border:#242d38;
+      --ink:#e3e9ef; --ink-soft:#a9b6c3; --muted:#6e7d8c; --line:#222b35;
+      --green:#3fb98a; --green-bg:#0f2b21;
+      --amber:#d9a441; --amber-bg:#2e2410;
+      --red:#e0705f; --red-bg:#331a16;
+      --water:#5aa3dd; --water-bg:#122436;
+      --purple:#9c8ae0; --purple-bg:#1d1930;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0d1117; --bg-soft:#161c24; --card:#141a21; --card-border:#242d38;
+    --ink:#e3e9ef; --ink-soft:#a9b6c3; --muted:#6e7d8c; --line:#222b35;
+    --green:#3fb98a; --green-bg:#0f2b21; --amber:#d9a441; --amber-bg:#2e2410;
+    --red:#e0705f; --red-bg:#331a16; --water:#5aa3dd; --water-bg:#122436;
+    --purple:#9c8ae0; --purple-bg:#1d1930;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg); color:var(--ink); font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; font-size:13.5px;}
+  h1,h2,h3{margin:0; letter-spacing:-.01em;}
+  .wrap{max-width:1280px; margin:0 auto; padding:20px 22px 60px;}
+  a{color:var(--water); text-decoration:none;}
+
+  header{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:18px;}
+  .brand{display:flex; align-items:center; gap:11px;}
+  .brand-mark{width:32px;height:32px;border-radius:var(--radius-sm);background:var(--ink);display:flex;align-items:center;justify-content:center;flex:none;}
+  .brand-mark svg{width:17px;height:17px;stroke:var(--card);fill:none;stroke-width:1.8;}
+  .brand h1{font-size:15px;font-weight:600;}
+  .brand p{margin:1px 0 0;font-size:11.5px;color:var(--muted);}
+  .hdr-right{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .pill{background:var(--card);border:1px solid var(--card-border);padding:6px 10px;border-radius:var(--radius-sm);font-size:11px;color:var(--muted);font-family:var(--mono);}
+  .btn{background:var(--card);border:1px solid var(--card-border);color:var(--ink-soft);padding:6px 12px;border-radius:var(--radius-sm);font-size:11.5px;font-weight:500;cursor:pointer;font-family:inherit;}
+  .btn:hover{border-color:var(--muted);color:var(--ink);}
+
+  .section-title{display:flex;align-items:baseline;justify-content:space-between;margin:30px 2px 10px;flex-wrap:wrap;gap:6px;border-bottom:1px solid var(--line);padding-bottom:7px;}
+  .section-title h2{font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:.9px;color:var(--ink-soft);}
+  .section-title span{font-size:11px;color:var(--muted);}
+
+  /* regional banner — the public feed, unmodified */
+  .regional{display:grid; grid-template-columns:auto 1fr; gap:24px; align-items:center;
+    background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:18px 20px;}
+  @media (max-width:720px){ .regional{grid-template-columns:1fr;} }
+  .reg-now{display:flex; align-items:center; gap:16px;}
+  .reg-temp{font-family:var(--mono); font-size:38px; font-weight:600; line-height:1; letter-spacing:-.02em;}
+  .reg-desc{font-size:13px; color:var(--ink-soft); line-height:1.5;}
+  .reg-desc b{color:var(--ink);}
+  .reg-stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--radius-sm); overflow:hidden;}
+  .rs{background:var(--card); padding:9px 11px; min-width:0;}
+  .rs .k{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;}
+  .rs .v{font-family:var(--mono);font-size:15px;font-weight:600;margin-top:3px;}
+
+  /* per-area cards */
+  .areas{display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:12px;}
+  .areas > *{min-width:0;}
+  .area{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:16px 18px; min-width:0;}
+  .area.risk-high{border-color:var(--red);}
+  .area.risk-watch{border-color:var(--amber);}
+  .area-head{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px;}
+  .area-name{font-size:14.5px; font-weight:600;}
+  .area-sub{font-size:10.5px; color:var(--muted); font-family:var(--mono); margin-top:3px;}
+  .outlook{padding:5px 11px; border-radius:999px; font-size:11px; font-weight:600; white-space:nowrap; flex:none;}
+  .outlook.low{background:var(--green-bg); color:var(--green);}
+  .outlook.watch{background:var(--amber-bg); color:var(--amber);}
+  .outlook.high{background:var(--red-bg); color:var(--red);}
+
+  .verdict{font-size:13px; line-height:1.6; color:var(--ink-soft); margin-bottom:14px;}
+  .verdict b{color:var(--ink);}
+  .verdict .lead{font-family:var(--mono); font-size:20px; font-weight:600; color:var(--ink); display:block; margin-bottom:5px;}
+  .area.risk-high .verdict .lead{color:var(--red);}
+  .area.risk-watch .verdict .lead{color:var(--amber);}
+
+  /* 12-hour strip */
+  .strip{display:grid; grid-template-columns:repeat(12,1fr); gap:3px; margin-bottom:6px;}
+  .hr{text-align:center; min-width:0;}
+  .hr .bar-box{height:56px; display:flex; align-items:flex-end; justify-content:center; margin-bottom:4px;}
+  .hr .bar{width:100%; background:var(--water); border-radius:2px 2px 0 0; min-height:2px; opacity:.85;}
+  .hr .bar.dry{background:var(--line);}
+  .hr .t{font-size:8.5px; color:var(--muted); font-family:var(--mono);}
+  .hr .mm{font-size:8.5px; color:var(--ink-soft); font-family:var(--mono); margin-top:1px;}
+  .hr.sat .t{color:var(--red); font-weight:600;}
+  .strip-key{font-size:10px; color:var(--muted); margin-bottom:12px;}
+
+  .ground{display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--radius-sm); overflow:hidden;}
+  .g{background:var(--card); padding:8px 10px; min-width:0;}
+  .g .k{font-size:8.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:600;}
+  .g .v{font-family:var(--mono);font-size:13.5px;font-weight:600;margin-top:2px;}
+  .g .v.good{color:var(--green);} .g .v.warn{color:var(--amber);} .g .v.bad{color:var(--red);}
+
+  .why{font-size:11px; color:var(--muted); line-height:1.6; margin-top:12px; padding-top:10px; border-top:1px solid var(--line);}
+  .why b{color:var(--ink-soft);}
+
+  .badge{font-family:var(--mono); font-size:8.5px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+    padding:2px 5px; border-radius:3px; vertical-align:2px;}
+  .badge.live{color:var(--green); background:var(--green-bg);}
+  .badge.sim{color:var(--amber); background:var(--amber-bg);}
+
+  .sources{display:grid; grid-template-columns:1fr 1fr; gap:22px; background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:16px 18px;}
+  @media (max-width:720px){ .sources{grid-template-columns:1fr;} }
+  .sources h5{font-size:10px;text-transform:uppercase;letter-spacing:.7px;margin:0 0 8px;padding-bottom:6px;border-bottom:1px solid var(--line);}
+  .sources h5.a{color:var(--green);} .sources h5.b{color:var(--amber);}
+  .sources ul{margin:0;padding:0;list-style:none;}
+  .sources li{font-size:11.5px;color:var(--ink-soft);padding:3px 0;font-family:var(--mono);}
+  .loading{color:var(--muted); font-size:12.5px; padding:30px; text-align:center;}
+  /* Storm scenario: the regional feed is replaced, and it says so. */
+  .storm-banner{display:flex;align-items:center;gap:12px;background:var(--amber-bg);border:1px solid var(--amber);
+    border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--ink);}
+  .storm-banner .sb-tag{font-family:var(--mono);font-size:9.5px;font-weight:600;text-transform:uppercase;
+    letter-spacing:.5px;color:var(--amber);background:var(--card);border-radius:var(--radius-sm);padding:3px 7px;}
+  .storm-banner .sb-text{flex:1;}
+  footer{margin-top:36px; padding-top:16px; border-top:1px solid var(--line); font-size:11px; color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="brand">
+    <div class="brand-mark"><svg viewBox="0 0 24 24"><path d="M12 2.6c3.6 4.6 6.8 8.5 6.8 11.7a6.8 6.8 0 1 1-13.6 0C6.2 11.1 9.4 7.2 12 2.6Z"/></svg></div>
+    <div>
+      <h1>FMS Field Forecast</h1>
+      <p>Per-field outlook · regional weather combined with ground state</p>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <span class="pill" id="clock">—</span>
+    <button class="btn" id="storm-btn">Simulate storm</button>
+    <a class="btn" href="dev.html">Dev console →</a>
+    <button class="btn" id="theme-toggle">Theme</button>
+  </div>
+</header>
+
+<div class="section-title">
+  <h2>Regional <span class="badge live" id="reg-badge">live</span></h2>
+  <span id="reg-src">Open-Meteo · 14.53°N, 121.00°E</span>
+</div>
+<div id="storm-banner" hidden></div>
+<div id="regional"><div class="loading">Fetching live weather…</div></div>
+
+<div class="section-title">
+  <h2>By field</h2>
+  <span>same sky, different ground — outlook is per node</span>
+</div>
+<div class="areas" id="areas"></div>
+
+<div class="section-title"><h2>Where each number comes from</h2></div>
+<div class="sources">
+  <div>
+    <h5 class="a">Live</h5>
+    <ul>
+      <li>Regional temperature, humidity</li>
+      <li>Hourly rainfall forecast, 12h</li>
+      <li>Conditions code</li>
+    </ul>
+  </div>
+  <div>
+    <h5 class="b">Simulated</h5>
+    <ul>
+      <li>All node soil and water readings</li>
+      <li>Per-field outlook derived from them</li>
+      <li>Hardware is built but not yet logging</li>
+    </ul>
+  </div>
+</div>
+
+<footer>
+  Regional weather is live from open-meteo.com. Node readings are simulated within
+  the ranges measured on our own bench (dry ≈875, saturated ≈385 raw ADC). The
+  per-field outlook is a model, not a validated forecast.
+</footer>
+
+</div>
+<script>
+/* =========================================================================
+   Thresholds from the Sensor Findings Brief, 2026-09-17.
+   ========================================================================= */
+const SOIL_DRY_MEAN = 875.0, SOIL_SAT_MEAN = 385.4;
+const SOIL_FLOOD_THRESHOLD = 436;   // saturated
+const SOIL_WATCH_THRESHOLD = 551;   // wetter than ideal
+const SOIL_HEALTHY_FLOOR = 552, SOIL_HEALTHY_CEIL = 699;
+const SOIL_DRYING_CEIL = 828;
+const WATER_FLOOD_THRESHOLD = 30;
+const RAIN_WET_MM = 0.2;
+
+const ZONES = [
+  {max:SOIL_FLOOD_THRESHOLD, label:"Saturated",         cls:"bad"},
+  {max:SOIL_WATCH_THRESHOLD, label:"Wetter than ideal", cls:"warn"},
+  {max:SOIL_HEALTHY_CEIL,    label:"Healthy",           cls:"good"},
+  {max:SOIL_DRYING_CEIL,     label:"Drying out",        cls:"warn"},
+  {max:959,                  label:"Critically dry",    cls:"bad"},
+  {max:Infinity,             label:"Probe out of soil", cls:"bad"}
+];
+const zoneOf = raw => ZONES.find(z => raw <= z.max);
+
+const BASE = {lat:14.5333, lon:121.0000};
+
+/* Three fields, deliberately in different ground states so the same
+   regional forecast produces three different outlooks — which is the
+   entire point of measuring per field rather than per region. */
+const FIELDS = [
+  {id:"1", name:"North Rice Paddy", area:"North block", soil:661, water:0,
+   drainage:"good",  note:"raised bund, drains to the north ditch"},
+  {id:"2", name:"East Canal Field", area:"Canal side",  soil:470, water:12,
+   drainage:"poor",  note:"lowest block, backs onto the canal"},
+  {id:"3", name:"Riverside Plot",   area:"River flat",  soil:812, water:0,
+   drainage:"fair",  note:"sandy, dries fastest of the three"}
+];
+
+/* How fast each field takes on water per mm of rain, in raw ADC. This is a
+   modelled figure, not measured — no wetting event has been logged yet.
+   Drainage scales it: a poorly-drained block holds what falls on it. */
+const WETTING_ADC_PER_MM = {good: 5, fair: 7, poor: 11};
+const DRYBACK_ADC_PER_H  = {good: 9, fair: 12, poor: 5};
+
+const WMO = {0:"Clear sky",1:"Mainly clear",2:"Partly cloudy",3:"Overcast",45:"Fog",48:"Rime fog",
+ 51:"Light drizzle",53:"Moderate drizzle",55:"Dense drizzle",61:"Slight rain",63:"Moderate rain",
+ 65:"Heavy rain",66:"Freezing rain",67:"Heavy freezing rain",71:"Slight snow",80:"Slight showers",
+ 81:"Moderate showers",82:"Violent showers",95:"Thunderstorm",96:"Thunderstorm with hail",99:"Severe thunderstorm"};
+
+let wx = null, liveHours = null, stormOn = false;
+
+/* A 12-hour storm profile, used to show what the fields do under rain the
+   real forecast is not offering today. Only the regional rainfall figures
+   are replaced; the ground state and the model are untouched. The banner
+   stays up the whole time it is active. */
+const STORM_HOURS = [1.2, 3.5, 7.0, 9.5, 8.0, 5.5, 3.0, 1.5, 0.4, 0, 0, 0];
+
+function fmtH(h){
+  if (h === null) return "—";
+  if (h <= 0) return "now";
+  if (h < 1) return `${Math.round(h*60)} min`;
+  return `${h.toFixed(h < 10 ? 1 : 0)} h`;
+}
+
+/* Walk the next 12 forecast hours, wetting each field by the rain that
+   actually falls on it and drying it back in the hours that stay dry. */
+function projectField(f, hours){
+  const perMM = WETTING_ADC_PER_MM[f.drainage];
+  const dryback = DRYBACK_ADC_PER_H[f.drainage];
+  let soil = f.soil, water = f.water;
+  let satAt = null, floodAt = null;
+  const path = [];
+  hours.forEach((mm, i) => {
+    if (mm >= RAIN_WET_MM){
+      soil = Math.max(SOIL_SAT_MEAN - 50, soil - mm*perMM);
+      if (soil <= SOIL_FLOOD_THRESHOLD) water += mm * (f.drainage === "poor" ? 9 : 4);
+    } else {
+      soil = Math.min(1023, soil + dryback);
+      water = Math.max(0, water - (f.drainage === "poor" ? 3 : 8));
+    }
+    if (satAt === null && soil <= SOIL_FLOOD_THRESHOLD) satAt = i + 1;
+    if (floodAt === null && water > WATER_FLOOD_THRESHOLD) floodAt = i + 1;
+    path.push({h:i+1, mm, soil:Math.round(soil), water:Math.round(water),
+               sat: soil <= SOIL_FLOOD_THRESHOLD});
+  });
+  return {path, satAt, floodAt, endSoil:Math.round(soil), endWater:Math.round(water)};
+}
+
+function outlookFor(f, proj, total12){
+  if (f.water > WATER_FLOOD_THRESHOLD) return {key:"high", label:"Flooding now"};
+  if (proj.floodAt !== null && proj.floodAt <= 6) return {key:"high", label:"Flood likely"};
+  if (proj.floodAt !== null) return {key:"watch", label:"Flood possible"};
+  if (proj.satAt !== null) return {key:"watch", label:"Saturation likely"};
+  if (total12 >= 10) return {key:"watch", label:"Heavy rain, ground holding"};
+  return {key:"low", label:"Low risk"};
+}
+
+function renderRegional(){
+  const c = wx.current;
+  const next12 = wx.hours.slice(0,12).reduce((a,b)=>a+b,0);
+  const next6  = wx.hours.slice(0,6).reduce((a,b)=>a+b,0);
+  document.getElementById("regional").innerHTML = `
+    <div class="regional">
+      <div class="reg-now">
+        <div class="reg-temp">${Math.round(c.temperature_2m)}°</div>
+        <div class="reg-desc">
+          <b>${WMO[c.weather_code] ?? "Unknown"}</b><br>
+          ${next12 >= 1 ? `${next12.toFixed(1)}mm expected over 12 hours` : "Little to no rain expected"}
+        </div>
+      </div>
+      <div class="reg-stats">
+        <div class="rs"><div class="k">Humidity</div><div class="v">${c.relative_humidity_2m}%</div></div>
+        <div class="rs"><div class="k">Rain now</div><div class="v">${(c.precipitation ?? 0).toFixed(1)}mm</div></div>
+        <div class="rs"><div class="k">Next 6h</div><div class="v">${next6.toFixed(1)}mm</div></div>
+        <div class="rs"><div class="k">Next 12h</div><div class="v">${next12.toFixed(1)}mm</div></div>
+        <div class="rs"><div class="k">Fields</div><div class="v">${FIELDS.length}</div></div>
+      </div>
+    </div>`;
+}
+
+function renderAreas(){
+  const hours = wx.hours.slice(0,12);
+  const total12 = hours.reduce((a,b)=>a+b,0);
+  const peak = Math.max(...hours, 1);
+  const now = new Date();
+
+  document.getElementById("areas").innerHTML = FIELDS.map(f=>{
+    const proj = projectField(f, hours);
+    const ol = outlookFor(f, proj, total12);
+    const z = zoneOf(f.soil);
+
+    const lead = f.water > WATER_FLOOD_THRESHOLD ? "Flooding"
+               : proj.floodAt !== null ? fmtH(proj.floodAt)
+               : proj.satAt !== null ? fmtH(proj.satAt)
+               : "Clear 12h";
+
+    let body;
+    if (f.water > WATER_FLOOD_THRESHOLD){
+      body = `Standing water in <b>${f.area}</b> now. ${f.note}.`;
+    } else if (proj.floodAt !== null){
+      body = `On the forecast rain, <b>${f.area}</b> reaches standing water in about <b>${fmtH(proj.floodAt)}</b>. Ground is ${z.label.toLowerCase()} and drainage here is ${f.drainage}.`;
+    } else if (proj.satAt !== null){
+      body = `<b>${f.area}</b> saturates in about <b>${fmtH(proj.satAt)}</b> but doesn't reach standing water inside 12 hours.`;
+    } else if (total12 >= 10){
+      body = `<b>${total12.toFixed(0)}mm</b> forecast, but ${f.area.toLowerCase()} starts ${z.label.toLowerCase()} with ${f.drainage} drainage — it should absorb this.`;
+    } else {
+      body = `Nothing expected to trouble <b>${f.area.toLowerCase()}</b> in the next 12 hours.`;
+    }
+
+    const strip = proj.path.map((p,i)=>{
+      const t = new Date(now.getTime() + (i+1)*3600e3);
+      const h = Math.max(2, Math.round(p.mm/peak*52));
+      return `<div class="hr ${p.sat?'sat':''}">
+        <div class="bar-box"><div class="bar ${p.mm<RAIN_WET_MM?'dry':''}" style="height:${h}px"></div></div>
+        <div class="t">${t.getHours().toString().padStart(2,'0')}</div>
+        <div class="mm">${p.mm>=0.1?p.mm.toFixed(1):'·'}</div>
+      </div>`;
+    }).join("");
+
+    return `
+      <div class="area risk-${ol.key}">
+        <div class="area-head">
+          <div>
+            <div class="area-name">${f.name}</div>
+            <div class="area-sub">${f.area} · drainage ${f.drainage}</div>
+          </div>
+          <span class="outlook ${ol.key}">${ol.label}</span>
+        </div>
+        <div class="verdict"><span class="lead">${lead}</span>${body}</div>
+        <div class="strip">${strip}</div>
+        <div class="strip-key">Hourly rainfall, mm · red hour = soil projected at or past ${SOIL_FLOOD_THRESHOLD}</div>
+        <div class="ground">
+          <div class="g"><div class="k">Soil now</div><div class="v ${z.cls}">${f.soil}</div></div>
+          <div class="g"><div class="k">Condition</div><div class="v ${z.cls}" style="font-size:11px;">${z.label}</div></div>
+          <div class="g"><div class="k">Water</div><div class="v ${f.water>WATER_FLOOD_THRESHOLD?'bad':''}">${f.water}</div></div>
+        </div>
+        <div class="why"><b>Why this differs from the regional forecast:</b> ${f.note}. Same rain, but this block starts at ${f.soil} raw and sheds water ${f.drainage === "poor" ? "slowly" : f.drainage === "fair" ? "moderately" : "well"}, so it responds differently to the hours above.</div>
+      </div>`;
+  }).join("");
+}
+
+async function load(){
+  try{
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${BASE.lat}&longitude=${BASE.lon}`
+      + `&current=temperature_2m,precipitation,weather_code,relative_humidity_2m`
+      + `&hourly=precipitation&forecast_hours=13&timezone=Asia%2FManila`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const d = await res.json();
+    liveHours = (d.hourly.precipitation || []).slice(0,12);
+    wx = {current: d.current, hours: stormOn ? STORM_HOURS.slice() : liveHours.slice()};
+    renderRegional(); renderAreas();
+  } catch(e){
+    document.getElementById("regional").innerHTML =
+      `<div class="loading">Couldn't reach api.open-meteo.com — this page needs internet for the regional feed.
+       <button class="btn" id="retry" style="margin-left:8px;">Retry</button></div>`;
+    document.getElementById("retry").addEventListener("click", load);
+  }
+}
+
+document.getElementById("storm-btn").addEventListener("click", ()=>{
+  if (!wx) return;
+  stormOn = !stormOn;
+  wx.hours = stormOn ? STORM_HOURS.slice() : (liveHours || []).slice();
+  const b = document.getElementById("storm-banner");
+  b.hidden = !stormOn;
+  b.className = stormOn ? "storm-banner" : "";
+  b.innerHTML = stormOn
+    ? `<span class="sb-tag">Simulated</span><span class="sb-text">Regional rainfall replaced with a storm profile — ${STORM_HOURS.reduce((a,c)=>a+c,0).toFixed(1)}mm over 12h. Ground readings and the model are unchanged.</span>`
+    : "";
+  document.getElementById("storm-btn").textContent = stormOn ? "Back to live" : "Simulate storm";
+  document.getElementById("reg-src").textContent = stormOn
+    ? "Simulated storm profile" : "Open-Meteo · 14.53°N, 121.00°E";
+  // The badge must not keep saying "live" while the feed is substituted.
+  const rb = document.getElementById("reg-badge");
+  rb.textContent = stormOn ? "simulated" : "live";
+  rb.className = stormOn ? "badge sim" : "badge live";
+  renderRegional(); renderAreas();
+});
+
+document.getElementById("theme-toggle").addEventListener("click", ()=>{
+  const cur = document.documentElement.getAttribute("data-theme");
+  const next = cur === "dark" ? "light" : cur === "light" ? "dark"
+    : (matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark");
+  document.documentElement.setAttribute("data-theme", next);
+  try{ localStorage.setItem("fms-theme", next); }catch(e){}
+});
+try{ const t = localStorage.getItem("fms-theme"); if (t) document.documentElement.setAttribute("data-theme", t); }catch(e){}
+
+setInterval(()=>{ document.getElementById("clock").textContent = new Date().toLocaleTimeString([], {hour12:false}); }, 1000);
+document.getElementById("clock").textContent = new Date().toLocaleTimeString([], {hour12:false});
+load();
+</script>
+</body>
+</html>
