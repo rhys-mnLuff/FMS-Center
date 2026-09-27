@@ -440,9 +440,9 @@
   <div class="controls-bar">
     <span class="label">Sim speed</span>
     <button data-speed="0">Pause</button>
-    <button data-speed="1" class="active">1×</button>
+    <button data-speed="1">1×</button>
     <button data-speed="4">4×</button>
-    <button data-speed="15">15×</button>
+    <button data-speed="15" class="active">15×</button>
     <button data-speed="40">40×</button>
     <span class="spacer"></span>
     <button class="danger" id="run-demo">▶ Run flood sequence</button>
@@ -878,7 +878,7 @@ function pushEvent(type, node, detail){
 /* =========================================================================
    SIMULATION ENGINE
    ========================================================================= */
-let speedMult = 1;
+let speedMult = 15;   // default: fast enough that a scenario moves on screen
 let simClock = 0;
 let nextRead = {1:0,2:0,3:3300,R:1800};
 let lastTickWall = performance.now();
@@ -2189,7 +2189,7 @@ function stopDemo(){
 
 function startDemo(){
   if (demoTimer){ stopDemo(); return; }
-  setSpeed(4);                       // 4x keeps the whole run near 90s of tape
+  setSpeed(4);                       // 4x keeps the demo run near 90s of tape
   demoWeather = makeDemoWeather();
   demoT = 0;
   document.getElementById("run-demo").textContent = "■ Stop sequence";
