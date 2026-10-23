@@ -153,7 +153,7 @@ const char API_KEY_NODE_2[] = "REPLACE_WITH_NODE_2_KEY"; // was missing, added a
 const char API_KEY_NODE_3[] = "REPLACE_WITH_NODE_3_KEY"; // was missing, added as placeholder
 
 // --- SERVER ENDPOINT (swap these two lines once the custom app is live) ---
-const char SERVER_HOST[] = "generations-unix-come-cartridges.trycloudflare.com";
+const char SERVER_HOST[] = "api.thingspeak.com";
 const char SERVER_PATH[] = "/update";
 
 // --- SITE NAMES shown in every SMS (node 1, 2, 3). Keep each under ~25 characters. ---
@@ -1116,14 +1116,10 @@ void sendToThingSpeak(const NodeInfo &n, int healthIndex) {
   radioWait(1000);
   sim7600.println(F("AT+HTTPINIT"));
   radioWait(500);
-  sim7600.println(F("AT+HTTPPARA=\"SSLCFG\",0"));   // TLS done by the modem, not the Nano
-  radioWait(300);
-  sim7600.println(F("AT+HTTPSSL=1"));
-  radioWait(300);
 
   // Uses SERVER_HOST/SERVER_PATH so this can point at the new app later
   // by changing two constants at the top of the file, nothing here.
-  sim7600.print(F("AT+HTTPPARA=\"URL\",\"https://"));
+  sim7600.print(F("AT+HTTPPARA=\"URL\",\"http://"));
   sim7600.print(SERVER_HOST);
   sim7600.print(SERVER_PATH);
   sim7600.print(F("?api_key="));
