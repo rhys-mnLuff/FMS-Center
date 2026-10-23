@@ -54,6 +54,10 @@ def parse_reading(line):
                 pass
         elif key == "rain":
             out["rain"] = val.split()[0] if val else None
+        elif key == "batt":
+            mb = re.match(r"(\d+)%", val)
+            if mb:
+                out["batt_pct"] = int(mb.group(1))
         elif key == "risk":
             out["risk"] = val.split()[0] if val else None
     # soil and water are the only fields we actually forward; without both
@@ -66,8 +70,10 @@ RISK = {"NORMAL": 0, "WATCH": 1, "WARNING": 2, "FLOOD": 3}
 power_cache = {}   # node -> (mv, ma)
 
 
-def post(endpoint, key, node, soil, water, risk, lat, lon, verbose):
+def post(endpoint, key, node, soil, water, risk, lat, lon, verbose, batt_pct=None):
     q = {"api_key": key, "field1": soil, "field2": water}
+    if batt_pct is not None:
+        q["field5"] = batt_pct
     # field3 is the health index. The dashboard derives it from soil with the
     # same formula, so sending a second copy would just be a thing to drift.
     if risk is not None:
@@ -129,7 +135,7 @@ def main():
                 if not a.quiet:
                     print(f"[read ] {line}")
                 if post(a.endpoint, a.key, r["node"], r["soil"], r["water"],
-                        risk, a.lat, a.lon, not a.quiet):
+                        risk, a.lat, a.lon, not a.quiet, r.get("batt_pct")):
                     sent += 1
                 continue
 

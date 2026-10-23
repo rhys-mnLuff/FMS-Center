@@ -1298,7 +1298,11 @@ function renderFleetStats(){
   const watching = nodes.filter(n=>!isOffline(n) && n.state==="WATCHING").length;
   const totalPackets = nodes.reduce((s,n)=>s+n.packets,0) + rainNode.packets;
   const totalSms = nodes.reduce((s,n)=>s+n.smsCount,0);
-  const avg = (fn)=> nodes.reduce((s,n)=>s+fn(n),0)/nodes.length;
+  // In live mode a node with no history has no reading to average; including
+  // its stale simulated value would blend real and invented data.
+  const reporting = liveMode ? nodes.filter(n=>n.history.length) : nodes;
+  const avg = (fn)=> reporting.length
+    ? reporting.reduce((s,n)=>s+fn(n),0)/reporting.length : 0;
   const avgSoil = avg(n=>n.soil).toFixed(0);
   const avgWater = avg(n=>n.water).toFixed(0);
   const last = n => n.history[n.history.length-1];
@@ -1350,7 +1354,11 @@ function batteryCellHtml(node){
 
 function renderNodesTable(){
   document.getElementById("nodes-table").innerHTML = nodes.map(n=>{
+    // With no history there is no reading. Falling back to n.soil/n.water
+    // would print the last simulated value as though a node had sent it.
+    const noData = liveMode && n.history.length === 0;
     const last = n.history[n.history.length-1] || {soil:n.soil,water:n.water,health:calculateSoilHealth(n.soil),pct:provisionalWetnessPct(n.soil),risk:riskScore(provisionalWetnessPct(n.soil),n.water),rate:0};
+    const D = v => noData ? "—" : v;
     const offline = isOffline(n);
     const meta = offline ? {cls:"offline", label: n.failReason==="brownout" ? "Offline (battery)" : n.failed ? "Offline (fault)" : "Offline"} : statusMeta(n.state);
     const secsAgo = Math.round((Date.now()-n.lastSeen)/1000);
@@ -1362,17 +1370,17 @@ function renderNodesTable(){
       <td>Field sensor</td>
       <td>${n.direct ? "Direct" : `Via Node ${n.relayVia}`}</td>
       <td><span class="row-badge ${meta.cls}">${meta.label}</span>${n.rapidFlagged && !offline ? ' <span class="row-badge suppressed" title="Soil moving fast. Rate threshold not yet calibrated, so this is an observation only.">Fast &Delta;</span>' : ''}</td>
-      <td>${batteryCellHtml(n)}</td>
-      <td class="n">${n.soil}</td>
-      <td class="n">${n.water}</td>
-      <td class="n">${last.health}</td>
-      <td class="n">${last.pct.toFixed(1)}%</td>
-      <td class="n">${last.risk.toFixed(0)}</td>
-      <td class="n">${last.rate>=0?"+":""}${last.rate.toFixed(1)}</td>
+      <td>${noData?"—":batteryCellHtml(n)}</td>
+      <td class="n">${D(n.soil)}</td>
+      <td class="n">${D(n.water)}</td>
+      <td class="n">${D(last.health)}</td>
+      <td class="n">${noData?"—":last.pct.toFixed(1)}%</td>
+      <td class="n">${noData?"—":last.risk.toFixed(0)}</td>
+      <td class="n">${noData?"—":(last.rate>=0?"+":"")+last.rate.toFixed(1)}</td>
       <td class="n">${n.overCount}/${n.underCount||0}</td>
       <td class="n">${n.packets}</td>
       <td class="n">${n.smsCount}</td>
-      <td>${lastSeenStr}</td>
+      <td>${noData?"never":lastSeenStr}</td>
       <td><button class="action-btn ${n.failed?'restore':'fail'}" data-toggle-fail="${n.id}">${n.failed ? "Restore" : "Simulate failure"}</button></td>
     </tr>`;
   }).join("");
@@ -2327,8 +2335,16 @@ function setLive(on){
   const btn = document.getElementById("live-btn");
   if (on){
     setSpeed(0);                       // stop the simulator; do not blend sources
+    // Clearing history is not enough: soil/water/battery keep their last
+    // simulated values and would still render. lastSeen = 0 forces every node
+    // to read OFFLINE until a real packet arrives for it, so a node that is
+    // not reporting cannot show an invented reading.
     nodes.forEach(n=>{ n.history = []; n.packets = 0; n.state = "NORMAL";
-                       n.overCount = 0; n.underCount = 0; });
+                       n.overCount = 0; n.underCount = 0;
+                       n.lastSeen = 0; n.failed = false; n.smsCount = 0; });
+    // The rain gauge has no hardware at all, so in live mode it has nothing
+    // to show rather than a simulated trace.
+    rainNode.history = []; rainNode.packets = 0; rainNode.lastSeen = 0;
     liveLastId = 0; liveSeen = 0; liveError = null;
     if (btn) btn.textContent = "■ Stop live feed";
     pollFeed();
