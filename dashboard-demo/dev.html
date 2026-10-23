@@ -467,6 +467,7 @@
     <button data-speed="15" class="active">15×</button>
     <button data-speed="40">40×</button>
     <span class="spacer"></span>
+    <button class="info" id="live-btn" style="background:var(--green); border-color:var(--green); color:#fff;">◉ Live feed</button>
     <button class="danger" id="run-demo">▶ Run flood sequence</button>
     <button class="danger" id="trigger-flood">Trigger flood · East Canal</button>
     <button class="info" id="trigger-storm">Trigger storm · rain gauge</button>
@@ -733,6 +734,49 @@ function systemPrefersDark(){ return window.matchMedia && window.matchMedia("(pr
 function applyThemeAttr(theme){ if (theme) document.documentElement.setAttribute("data-theme", theme); else document.documentElement.removeAttribute("data-theme"); }
 function effectiveTheme(){ return document.documentElement.getAttribute("data-theme") || (systemPrefersDark() ? "dark" : "light"); }
 (function initTheme(){ let saved=null; try{saved=localStorage.getItem(THEME_KEY);}catch(e){} applyThemeAttr(saved); })();
+
+/* =========================================================================
+   OFFLINE FALLBACKS
+
+   Chart.js and Leaflet come from CDNs. If they fail to load -- no internet,
+   blocked CDN, a field office on a hotspot -- every later `new Chart(...)`
+   throws and takes the whole script down with it, so the console shows
+   nothing at all rather than degrading. For a system whose whole premise is
+   working without internet, losing the numbers because a chart library is
+   missing is the wrong failure.
+
+   These stubs keep the same call surface. Charts and the map silently do
+   nothing; telemetry, prediction, advisory and alerts all still run.
+   ========================================================================= */
+const GRAPHICS_OK = (typeof Chart !== "undefined");
+const MAP_OK = (typeof L !== "undefined");
+
+if (!GRAPHICS_OK){
+  // datasets is indexed by position (datasets[i].data = [...]), so an empty
+  // array would throw on the first write. Hand back a stub for any index.
+  const dsProxy = new Proxy([], {
+    get: (t, k) => (typeof k === "string" && /^\d+$/.test(k))
+      ? (t[k] || (t[k] = {data:[], borderColor:"", backgroundColor:""}))
+      : Reflect.get(t, k)
+  });
+  window.Chart = function(){
+    return { data:{labels:[], datasets:dsProxy},
+             options:{scales:{x:{}, y:{grid:{}}}, plugins:{}},
+             update(){}, destroy(){}, resize(){} };
+  };
+  window.Chart.defaults = {color:"", borderColor:"", font:{}};
+}
+if (!MAP_OK){
+  const chain = () => { const o = new Proxy({}, {get: () => chain}); return o; };
+  window.L = {
+    map: () => ({ setView(){return this;}, panTo(){}, removeLayer(){}, addLayer(){} }),
+    tileLayer: () => ({ addTo(){ return this; } }),
+    marker: () => ({ addTo(){return this;}, bindTooltip(){return this;},
+                     on(){return this;}, setIcon(){return this;} }),
+    polyline: () => ({ addTo(){return this;}, setStyle(){return this;} }),
+    divIcon: () => ({})
+  };
+}
 
 /* =========================================================================
    CONFIG — copied from Base_code / Sensor_code / CALIBRATION.md
@@ -2198,10 +2242,111 @@ async function fetchWeather(){
 /* =========================================================================
    MAIN LOOP
    ========================================================================= */
+/* =========================================================================
+   LIVE FEED — real readings from the ingest server.
+
+   The server receives the identical query string whether it arrived over
+   USB serial or over cellular, so this code does not know or care which
+   transport produced a reading. Switching the base station from the serial
+   bridge to THINGSPEAK_ENABLED 1 changes nothing here.
+
+   Live mode stops the simulator entirely rather than blending the two: a
+   chart mixing invented and measured readings would be worse than either.
+   ========================================================================= */
+const FEED_URL = "http://localhost:8080/feed";
+const FEED_POLL_MS = 4000;
+let liveMode = false, liveLastId = 0, liveSeen = 0, liveError = null;
+
+function setLiveBanner(){
+  let el = document.getElementById("live-banner");
+  if (!liveMode){ if (el) el.remove(); return; }
+  if (!el){
+    el = document.createElement("div");
+    el.id = "live-banner"; el.className = "demo-banner";
+    el.style.background = "var(--green-bg)"; el.style.borderColor = "var(--green)";
+    document.querySelector(".controls-bar").insertAdjacentElement("afterend", el);
+  }
+  const state = liveError ? `<b style="color:var(--red)">${liveError}</b>`
+                          : `${liveSeen} reading${liveSeen===1?"":"s"} received`;
+  el.innerHTML = `<span class="db-step" style="color:var(--green)">LIVE</span>
+    <span class="db-text">Real readings from the base station — simulator stopped. ${state}</span>
+    <button class="db-stop" id="live-stop" style="border-color:var(--green); color:var(--green)">Back to simulator</button>`;
+  document.getElementById("live-stop").addEventListener("click", ()=>setLive(false));
+}
+
+// Server rows -> the same history shape stepFieldNode() produces, so every
+// consumer (prediction, advisory, charts, map) works untouched.
+function ingestRows(rows){
+  let added = 0;
+  rows.slice().reverse().forEach(r=>{
+    if (r.id <= liveLastId) return;
+    liveLastId = r.id;
+    const node = nodes.find(n=>n.id === String(r.node));
+    if (!node) return;
+    const soil = r.soil, water = r.water;
+    if (soil === null || water === null) return;
+    const health = calculateSoilHealth(soil);
+    const pct = provisionalWetnessPct(soil);
+    const prev = node.history[node.history.length-1];
+    const rate = prev ? (pct - prev.pct) / (READ_INTERVAL_MS/60000) : 0;
+    node.soil = soil; node.water = water;
+    if (r.batt_pct !== null) node.battery = r.batt_pct;
+    node.history.push({t: r.ts, soil, water, health, pct,
+                       risk: riskScore(pct, water), rate, battery: node.battery});
+    if (node.history.length > 60) node.history.shift();
+    node.packets++; node.lastSeen = Date.now(); node.failed = false;
+    evaluateAlertState(node, false);
+    predictDirty = true;
+    added++;
+  });
+  return added;
+}
+
+async function pollFeed(){
+  if (!liveMode) return;
+  try{
+    const res = await fetch(`${FEED_URL}?limit=100`, {cache:"no-store"});
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const rows = await res.json();
+    liveError = null;
+    const n = ingestRows(rows);
+    if (n){
+      liveSeen += n;
+      renderFleetStats(); renderNodesTable(); renderEventsTable();
+      updateCharts(); updateMap(); updateNodeDetail();
+      renderNodeChips(); renderPrediction();
+    }
+  } catch(e){
+    liveError = `server unreachable (${FEED_URL}) — is fms_server.py running?`;
+  }
+  setLiveBanner();
+}
+
+function setLive(on){
+  liveMode = on;
+  const btn = document.getElementById("live-btn");
+  if (on){
+    setSpeed(0);                       // stop the simulator; do not blend sources
+    nodes.forEach(n=>{ n.history = []; n.packets = 0; n.state = "NORMAL";
+                       n.overCount = 0; n.underCount = 0; });
+    liveLastId = 0; liveSeen = 0; liveError = null;
+    if (btn) btn.textContent = "■ Stop live feed";
+    pollFeed();
+  } else {
+    if (btn) btn.textContent = "◉ Live feed";
+    setLiveBanner();
+    warmupHistory();                   // give the simulator history again
+    setSpeed(15);
+  }
+  renderNodesTable(); updateCharts();
+}
+setInterval(pollFeed, FEED_POLL_MS);
+
 function tick(){
   const now = performance.now();
   const wallDelta = now - lastTickWall;
   lastTickWall = now;
+  if (liveMode){ requestAnimationFrame(tick); return; }   // live data drives rendering
   if (speedMult > 0){
     simClock += wallDelta * speedMult;
     ["1","2","3"].forEach(id=>{
@@ -2321,6 +2466,7 @@ function startDemo(){
   demoTimer = setInterval(tick, 1000);
 }
 document.getElementById("run-demo").addEventListener("click", startDemo);
+document.getElementById("live-btn").addEventListener("click", ()=>setLive(!liveMode));
 document.getElementById("trigger-storm").addEventListener("click", ()=>{ rainNode.scenarioTick = 0; });
 
 document.getElementById("theme-toggle").addEventListener("click", ()=>{
