@@ -153,7 +153,7 @@ const char API_KEY_NODE_2[] = "REPLACE_WITH_NODE_2_KEY"; // was missing, added a
 const char API_KEY_NODE_3[] = "REPLACE_WITH_NODE_3_KEY"; // was missing, added as placeholder
 
 // --- SERVER ENDPOINT (swap these two lines once the custom app is live) ---
-const char SERVER_HOST[] = "api.thingspeak.com";
+const char SERVER_HOST[] = "generations-unix-come-cartridges.trycloudflare.com";
 const char SERVER_PATH[] = "/update";
 
 // --- SITE NAMES shown in every SMS (node 1, 2, 3). Keep each under ~25 characters. ---

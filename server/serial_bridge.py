@@ -22,17 +22,44 @@ Needs no cellular, no SIM credit and no internet. Standard library only.
 
 import argparse, re, sys, time, urllib.parse, urllib.request
 
-# Reading line. rain is a word here (NONE/LIGHT/HEAVY) -- the raw ADC value
-# only appears in the 'n' node-table output, so it is deliberately not
-# forwarded rather than invented from the class.
-RE_READING = re.compile(
-    r"NODE\s+(\d+)\s*\|\s*hops\s+(\d+)\s*\|\s*soil\s+(-?\d+)\s*\|\s*water\s+(-?\d+)"
-    r"\s*\|\s*rain\s+(\w+)\s*\|\s*batt\s+([^|]+?)(?:\s*\|\s*risk\s+(\w+))?\s*$"
-)
+# The reading line is pipe-separated and the fields are not in a fixed
+# position: "| just booted" appears only after a reset, and an alerting node
+# appends "  << FLOOD LEVEL" after the risk word. A rigid field-order regex
+# silently dropped exactly those two cases -- including every flood reading,
+# which is the one that matters most. Parse by splitting on "|" instead.
+RE_NODE = re.compile(r"^NODE\s+(\d+)\s*\|")
 RE_POWER = re.compile(
     r"NODE\s+(\d+)\s+power\s*\|\s*([\d.]+)V\s*\|\s*10-min avg\s+(-?\d+)mA"
 )
-RE_BATT_PCT = re.compile(r"(\d+)%")
+
+
+def parse_reading(line):
+    """-> dict(node, soil, water, rain, risk) or None."""
+    m = RE_NODE.match(line.strip())
+    if not m:
+        return None
+    out = {"node": int(m.group(1))}
+    for seg in line.split("|")[1:]:
+        seg = seg.strip()
+        # "<<" marks an alert banner appended to the last field, not a field
+        seg = seg.split("<<")[0].strip()
+        if not seg:
+            continue
+        key, _, val = seg.partition(" ")
+        key, val = key.lower(), val.strip()
+        if key in ("soil", "water"):
+            try:
+                out[key] = int(val)
+            except ValueError:
+                pass
+        elif key == "rain":
+            out["rain"] = val.split()[0] if val else None
+        elif key == "risk":
+            out["risk"] = val.split()[0] if val else None
+    # soil and water are the only fields we actually forward; without both
+    # there is nothing to send.
+    return out if "soil" in out and "water" in out else None
+
 
 RISK = {"NORMAL": 0, "WATCH": 1, "WARNING": 2, "FLOOD": 3}
 
@@ -96,15 +123,13 @@ def main():
                     print(f"[power] node {node}  {volts}V  {ma}mA")
                 continue
 
-            m = RE_READING.search(line)
-            if m:
-                node = int(m.group(1))
-                soil, water = int(m.group(3)), int(m.group(4))
-                risk = RISK.get((m.group(7) or "").upper())
+            r = parse_reading(line)
+            if r:
+                risk = RISK.get((r.get("risk") or "").upper())
                 if not a.quiet:
                     print(f"[read ] {line}")
-                if post(a.endpoint, a.key, node, soil, water, risk,
-                        a.lat, a.lon, not a.quiet):
+                if post(a.endpoint, a.key, r["node"], r["soil"], r["water"],
+                        risk, a.lat, a.lon, not a.quiet):
                     sent += 1
                 continue
 
