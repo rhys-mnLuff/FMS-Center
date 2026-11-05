@@ -11,608 +11,662 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
-  /* Instrumentation palette: cool neutrals, flat surfaces, hairline rules.
-     Reads as a monitoring tool rather than a product page — numbers are
-     monospaced everywhere and colour is reserved for state, not decoration. */
+  /* Layout: a fixed sidebar beside a scrolling column of cards on a soft
+     neutral page. Surfaces are white, generously padded and lightly
+     rounded; colour is reserved for state. */
   :root{
-    --bg:#f2f4f6; --bg-soft:#e8ebef; --card:#ffffff; --card-border:#d8dee5;
-    --ink:#101720; --ink-soft:#44505e; --muted:#76838f; --line:#e2e7ec;
-    --green:#0f7a54; --green-bg:#e2f3ec;
-    --amber:#9a6708; --amber-bg:#fbefd8;
-    --red:#b3392c; --red-bg:#fae5e2;
-    --water:#1f5f96; --water-bg:#e3edf6;
-    --purple:#5b48a8; --purple-bg:#eae7f6;
-    --shadow:none;
-    --radius:8px; --radius-sm:5px;
-    --map-filter:saturate(.35) contrast(1.02) brightness(1.02);
+    --bg:#f3f4f2; --bg-soft:#f0f1ee; --card:#ffffff; --card-border:#e7e8e3;
+    --ink:#1a211d; --ink-soft:#4d5751; --muted:#8c948e; --line:#eeefea;
+    --green:#1d7a54; --green-bg:#e7f4ed; --accent:#62b58c;
+    --amber:#8a6210; --amber-bg:#fbf1dc;
+    --red:#b23b2d; --red-bg:#fbeae7;
+    --water:#2b6490; --water-bg:#e9f0f6;
+    --purple:#5b4ea8; --purple-bg:#ece9f7;
+    --radius:16px; --radius-sm:11px; --radius-xs:8px;
+    --map-filter:saturate(.3) contrast(1.02) brightness(1.03);
     --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --bg:#0d1117; --bg-soft:#161c24; --card:#141a21; --card-border:#242d38;
-      --ink:#e3e9ef; --ink-soft:#a9b6c3; --muted:#6e7d8c; --line:#222b35;
-      --green:#3fb98a; --green-bg:#0f2b21;
-      --amber:#d9a441; --amber-bg:#2e2410;
-      --red:#e0705f; --red-bg:#331a16;
-      --water:#5aa3dd; --water-bg:#122436;
-      --purple:#9c8ae0; --purple-bg:#1d1930;
-      --shadow:none;
-      --map-filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.95) saturate(.35);
+      --bg:#0e1211; --bg-soft:#171c1a; --card:#151a18; --card-border:#242b28;
+      --ink:#e6eae7; --ink-soft:#a8b2ad; --muted:#6f7a74; --line:#222927;
+      --green:#4cba88; --green-bg:#122b21; --accent:#4cba88;
+      --amber:#d7a44a; --amber-bg:#2c2413;
+      --red:#e07262; --red-bg:#301b18;
+      --water:#5da5db; --water-bg:#122534;
+      --purple:#9b8ce0; --purple-bg:#1d1930;
+      --map-filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.95) saturate(.3);
     }
   }
   :root[data-theme="dark"]{
-    --bg:#0d1117; --bg-soft:#161c24; --card:#141a21; --card-border:#242d38;
-    --ink:#e3e9ef; --ink-soft:#a9b6c3; --muted:#6e7d8c; --line:#222b35;
-    --green:#3fb98a; --green-bg:#0f2b21;
-    --amber:#d9a441; --amber-bg:#2e2410;
-    --red:#e0705f; --red-bg:#331a16;
-    --water:#5aa3dd; --water-bg:#122436;
-    --purple:#9c8ae0; --purple-bg:#1d1930;
-    --shadow:none;
-    --map-filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.95) saturate(.35);
+    --bg:#0e1211; --bg-soft:#171c1a; --card:#151a18; --card-border:#242b28;
+    --ink:#e6eae7; --ink-soft:#a8b2ad; --muted:#6f7a74; --line:#222927;
+    --green:#4cba88; --green-bg:#122b21; --accent:#4cba88;
+    --amber:#d7a44a; --amber-bg:#2c2413;
+    --red:#e07262; --red-bg:#301b18;
+    --water:#5da5db; --water-bg:#122534;
+    --purple:#9b8ce0; --purple-bg:#1d1930;
+    --map-filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.95) saturate(.3);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
+  html{scroll-behavior:smooth; scroll-padding-top:18px;}
   body{
     background:var(--bg); color:var(--ink);
     font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-    min-height:100vh; transition:background .2s,color .2s; font-size:13.5px;
+    min-height:100vh; font-size:13.5px; -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:1440px; margin:0 auto; padding:20px 22px 60px;}
-  h1,h2,h3{font-family:inherit; margin:0; letter-spacing:-0.01em;}
-  /* Every figure is monospaced so columns of numbers line up and a changing
-     digit doesn't reflow the row beside it. */
-  .num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
-  code{font-family:var(--mono); font-size:.92em; background:var(--bg-soft); padding:1px 5px; border-radius:4px;}
+  h1,h2,h3,h4,h5{font-family:inherit; margin:0; letter-spacing:-0.015em;}
+  /* Figures that sit in columns stay monospaced (td.n) so a changing digit
+     doesn't shuffle the row beside it. Headline figures use the UI face with
+     tabular numerals, which reads calmer at display size. */
+  code{font-family:var(--mono); font-size:.92em; background:var(--bg-soft); padding:1px 5px; border-radius:5px;}
   a{color:var(--water);}
-  svg.icon{width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-0.15em;}
+  svg.icon{width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;vertical-align:-0.15em;}
 
-  header{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:16px;}
-  .brand{display:flex; align-items:center; gap:12px;}
-  .brand-mark{display:none;}
-  .brand-mark svg{width:17px;height:17px;stroke:var(--card);}
-  .brand h1{font-size:15px;font-weight:600;letter-spacing:.01em;}
-  .brand p{margin:1px 0 0;font-size:11.5px;color:var(--muted);}
-  .header-right{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
-  .pill{display:flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--card-border);padding:6px 10px;border-radius:var(--radius-sm);font-size:11px;color:var(--muted); font-weight:500; font-family:var(--mono);}
-  .pill a{color:inherit; text-decoration:none;}
-  .pill a:hover{color:var(--ink);}
-  .icon-btn{width:30px;height:30px;border-radius:var(--radius-sm);flex:none;background:var(--card);border:1px solid var(--card-border);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--ink-soft);}
-  .icon-btn svg{width:15px;height:15px;}
-  .icon-btn .icon-moon{display:none;}
-  :root[data-theme="dark"] .icon-btn .icon-sun{display:none;}
-  :root[data-theme="dark"] .icon-btn .icon-moon{display:block;}
+  /* ---------- shell ---------- */
+  .sidebar{
+    position:fixed; top:12px; left:12px; bottom:12px; width:218px; z-index:40;
+    background:var(--card); border:1px solid var(--card-border); border-radius:18px;
+    padding:16px 12px 14px; display:flex; flex-direction:column; gap:14px;
+  }
+  .sb-brand{display:flex; align-items:center; gap:9px; padding:4px 8px 2px;}
+  .sb-mark{width:26px; height:26px; border-radius:8px; background:var(--ink); color:var(--card);
+    display:flex; align-items:center; justify-content:center; flex:none;}
+  .sb-mark svg{width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;}
+  .sb-brand b{font-size:14.5px; font-weight:600; letter-spacing:-0.02em;}
+  .sb-nav{display:flex; flex-direction:column; gap:1px; overflow-y:auto; flex:1; margin:0 -2px;}
+  .sb-nav a{
+    display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px;
+    font-size:13px; color:var(--ink-soft); text-decoration:none; font-weight:450;
+  }
+  .sb-nav a svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex:none; opacity:.8;}
+  .sb-nav a:hover{background:var(--bg-soft); color:var(--ink);}
+  .sb-nav a.on{background:var(--bg-soft); color:var(--ink); font-weight:550;}
+  .sb-nav a.on svg{opacity:1; color:var(--green);}
+  .sb-foot{border-top:1px solid var(--line); padding-top:10px; display:flex; flex-direction:column; gap:3px;}
+  .sb-foot a, .sb-foot button{
+    display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px;
+    font-size:13px; color:var(--ink-soft); text-decoration:none; font-weight:450;
+    background:transparent; border:none; cursor:pointer; font-family:inherit; width:100%; text-align:left;
+  }
+  .sb-foot a svg, .sb-foot button svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex:none; opacity:.8;}
+  .sb-foot a:hover, .sb-foot button:hover{background:var(--bg-soft); color:var(--ink);}
+  .icon-moon{display:none;}
+  :root[data-theme="dark"] .icon-sun{display:none;}
+  :root[data-theme="dark"] .icon-moon{display:block;}
   @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]) .icon-btn .icon-sun{display:none;}
-    :root:not([data-theme="light"]) .icon-btn .icon-moon{display:block;}
+    :root:not([data-theme="light"]) .icon-sun{display:none;}
+    :root:not([data-theme="light"]) .icon-moon{display:block;}
   }
 
-  .controls-bar{
-    display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+  .main{margin-left:246px; padding:22px 24px 56px; max-width:1560px;}
+  @media (max-width:960px){
+    .sidebar{position:static; width:auto; margin:10px 10px 0; bottom:auto; flex-direction:row;
+      align-items:center; gap:10px; padding:10px 12px; border-radius:14px;}
+    .sb-nav{flex-direction:row; overflow-x:auto; gap:2px; flex:1;}
+    .sb-nav a{white-space:nowrap; padding:7px 10px;}
+    .sb-nav a svg{display:none;}
+    .sb-foot{border-top:none; border-left:1px solid var(--line); padding:0 0 0 10px; flex-direction:row;}
+    .sb-foot a span, .sb-foot button span{display:none;}
+    .main{margin-left:0; padding:16px 12px 48px;}
+  }
+
+  /* ---------- page head ---------- */
+  .page-head{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin:4px 2px 20px;}
+  .page-head h1{font-size:27px; font-weight:600; letter-spacing:-0.03em;}
+  .head-right{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .hpill{
+    display:inline-flex; align-items:center; gap:7px; background:var(--card);
+    border:1px solid var(--card-border); border-radius:999px; padding:7px 14px;
+    font-size:12.5px; color:var(--ink-soft); font-weight:450;
+  }
+  .hpill svg{width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; opacity:.75;}
+  .hpill #clock{font-variant-numeric:tabular-nums;}
+  .hpill i{width:7px; height:7px; border-radius:50%; background:var(--muted); flex:none;}
+  .hpill.live i{background:var(--green); box-shadow:0 0 0 3px var(--green-bg);}
+
+  /* ---------- toolbar ---------- */
+  .toolbar{
+    display:flex; align-items:center; gap:7px; flex-wrap:wrap;
     background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius);
-    padding:8px 10px; margin-bottom:18px;
+    padding:9px 11px; margin-bottom:22px;
   }
-  .controls-bar .label{font-size:10px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.7px; padding-left:4px;}
-  .controls-bar button{
+  .seg{display:inline-flex; background:var(--bg-soft); border-radius:999px; padding:3px; gap:2px;}
+  .seg button{
+    background:transparent; border:none; color:var(--muted); font-family:inherit;
+    padding:5px 12px; border-radius:999px; font-size:12px; font-weight:500; cursor:pointer;
+  }
+  .seg button:hover{color:var(--ink);}
+  .seg button.active{background:var(--card); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.05);}
+  .toolbar .tbtn{
     background:transparent; border:1px solid var(--card-border); color:var(--ink-soft);
-    padding:5px 11px; border-radius:var(--radius-sm); font-size:11.5px; font-weight:500; cursor:pointer;
-    font-family:inherit;
+    padding:6px 13px; border-radius:999px; font-size:12px; font-weight:500; cursor:pointer; font-family:inherit;
   }
-  .controls-bar button:hover{border-color:var(--muted); color:var(--ink);}
-  .controls-bar button.active{background:var(--ink); color:var(--card); border-color:var(--ink);}
-  .controls-bar button.danger{background:var(--red); color:#fff; border-color:var(--red);}
-  .controls-bar button.info{background:var(--purple); color:#fff; border-color:var(--purple);}
-  .controls-bar .spacer{flex:1;}
+  .toolbar .tbtn:hover{border-color:var(--muted); color:var(--ink);}
+  .toolbar .tbtn.active{background:var(--ink); color:var(--card); border-color:var(--ink);}
+  .toolbar .spacer{flex:1;}
 
-  .banner{
-    display:flex; gap:10px; align-items:flex-start; font-size:12px; line-height:1.5; color:var(--ink-soft);
-    background:var(--bg-soft); border:1px solid var(--card-border); border-left:3px solid var(--muted); border-radius:var(--radius-sm);
-    padding:11px 14px; margin-bottom:18px;
+  /* Created at runtime by setLiveBanner() / startDemo(). */
+  .demo-banner{
+    font-size:12.5px; line-height:1.55; color:var(--ink-soft);
+    background:var(--card); border:1px solid var(--card-border); border-left:3px solid var(--accent);
+    border-radius:var(--radius-sm); padding:12px 15px; margin-bottom:18px;
   }
-  .banner svg{color:var(--purple); flex:none; margin-top:1px;}
+  .demo-banner b{color:var(--ink);}
 
-  .lead-band{border-left:2px solid var(--water); padding-left:16px; margin-bottom:34px;}
-  .lead-band .section-title:first-child{margin-top:4px;}
-  .section-title{
-    display:flex; align-items:baseline; justify-content:space-between;
-    margin:30px 2px 10px; flex-wrap:wrap; gap:6px;
-    border-bottom:1px solid var(--line); padding-bottom:7px;
-  }
-  .section-title h2{font-size:13px; font-weight:600; letter-spacing:-0.01em; color:var(--ink);}
-  .section-title span{font-size:11px; color:var(--muted);}
+  .section-title{display:flex; align-items:baseline; justify-content:space-between; margin:30px 2px 12px; flex-wrap:wrap; gap:6px;}
+  .section-title h2{font-size:16px; font-weight:600; letter-spacing:-0.02em; color:var(--ink);}
+  .section-title span{font-size:12px; color:var(--muted);}
 
-  /* stat grid */
-  /* Fixed tracks, not auto-fit: 14 fleet tiles land as two even rows of 7
-     instead of 8 + a ragged 6, and 6 economics tiles as one row of 6. */
-  .stat-grid{display:grid; grid-template-columns:repeat(8,1fr); gap:8px;}
-  #economics-stats{grid-template-columns:repeat(6,1fr);}
-  @media (max-width:1240px){ .stat-grid{grid-template-columns:repeat(4,1fr);} #economics-stats{grid-template-columns:repeat(3,1fr);} }
-  @media (max-width:780px){ .stat-grid, #economics-stats{grid-template-columns:repeat(2,1fr);} }
-  .stat-tile{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius-sm); padding:11px 13px; min-width:0;}
-  .stat-tile .st-label{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px;}
-  .stat-tile .st-value{font-size:20px; font-weight:600; font-family:var(--mono); font-variant-numeric:tabular-nums; margin-top:4px; letter-spacing:-.02em; color:var(--ink);}
-  .stat-tile .st-sub{font-size:10.5px; color:var(--muted); margin-top:2px;}
+  /* ---------- stat tiles ---------- */
+  .stat-grid{display:grid; grid-template-columns:repeat(6,1fr); gap:10px;}
+  #economics-stats{grid-template-columns:repeat(4,1fr);}
+  @media (max-width:1240px){ .stat-grid, #economics-stats{grid-template-columns:repeat(3,1fr);} }
+  @media (max-width:720px){ .stat-grid, #economics-stats{grid-template-columns:repeat(2,1fr);} }
+  .stat-tile{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:15px 17px 16px; min-width:0;}
+  .stat-tile .st-top{display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:21px;}
+  .stat-tile .st-label{font-size:12.5px; color:var(--muted); font-weight:450; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .stat-tile .st-delta{font-size:11.5px; font-weight:600; padding:2px 8px; border-radius:999px; background:var(--bg-soft); color:var(--muted); flex:none;}
+  .stat-tile .st-delta.up{background:var(--green-bg); color:var(--green);}
+  .stat-tile .st-delta.down{background:var(--red-bg); color:var(--red);}
+  .stat-tile .st-value{font-size:25px; font-weight:600; font-variant-numeric:tabular-nums; margin-top:9px; letter-spacing:-.035em; color:var(--ink); line-height:1.1;}
+  .stat-tile .st-value small{font-size:14px; font-weight:500; color:var(--muted); letter-spacing:0;}
   .stat-tile.warn .st-value{color:var(--amber);}
   .stat-tile.bad .st-value{color:var(--red);}
 
-  /* data table */
-  .table-wrap{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); overflow-x:auto;}
-  table{width:100%; border-collapse:collapse; font-size:12px; min-width:820px;}
-  th,td{padding:9px 12px; text-align:left; border-bottom:1px solid var(--line); white-space:nowrap;}
-  th{color:var(--muted); font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.4px; background:var(--bg-soft); position:sticky; top:0;}
+  /* ---------- tables ---------- */
+  .table-wrap{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); overflow-x:auto; padding:4px 6px;}
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th,td{padding:11px 12px; text-align:left; border-bottom:1px dashed var(--line); white-space:nowrap;}
+  th{color:var(--muted); font-weight:500; font-size:12px; letter-spacing:0; background:transparent;}
   td{color:var(--ink-soft);}
-  td.n{color:var(--ink); font-weight:700; font-family:var(--mono);}
+  td.n{color:var(--ink); font-weight:550; font-family:var(--mono); font-size:12px;}
   tr:last-child td{border-bottom:none;}
-  .row-badge{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--green-bg);color:var(--green);}
+  .row-badge{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:550;padding:3px 9px;border-radius:999px;background:var(--green-bg);color:var(--green);}
   .row-badge.watch{background:var(--amber-bg);color:var(--amber);}
   .row-badge.alert{background:var(--red-bg);color:var(--red);}
-  .row-badge.planned{background:var(--purple-bg);color:var(--purple);}
+  .row-badge.planned{background:var(--bg-soft);color:var(--muted);font-weight:500;}
   .row-badge.quiet{background:transparent; color:var(--muted); border:none; padding-left:4px;}
   .row-badge.suppressed{background:var(--amber-bg);color:var(--amber);}
   .row-badge.state{background:var(--water-bg);color:var(--water);}
-  .row-badge.offline{background:var(--bg-soft);color:var(--muted);border:1px dashed var(--muted);}
+  .row-badge.offline{background:var(--bg-soft);color:var(--muted);}
   .row-badge.failure{background:var(--red-bg);color:var(--red);}
 
-  .battery-cell{display:flex; align-items:center; gap:6px;}
-  .battery-bar{width:44px; height:9px; border-radius:3px; background:var(--bg-soft); overflow:hidden; flex:none; border:1px solid var(--card-border);}
-  .battery-fill{height:100%; background:var(--green);}
+  .battery-cell{display:flex; align-items:center; gap:7px;}
+  .battery-bar{width:40px; height:6px; border-radius:999px; background:var(--bg-soft); overflow:hidden; flex:none;}
+  .battery-fill{height:100%; background:var(--accent); border-radius:999px;}
   .battery-fill.warn{background:var(--amber);}
   .battery-fill.bad{background:var(--red);}
-  .battery-pct{font-family:var(--mono); font-size:11px; color:var(--ink-soft); min-width:30px;}
+  .battery-pct{font-variant-numeric:tabular-nums; font-size:12px; color:var(--ink-soft); min-width:30px;}
 
   .action-btn{
-    background:var(--card); border:1px solid var(--card-border); color:var(--ink-soft);
-    padding:4px 10px; border-radius:999px; font-size:10.5px; font-weight:700; cursor:pointer;
+    background:transparent; border:1px solid var(--card-border); color:var(--ink-soft);
+    padding:4px 11px; border-radius:999px; font-size:11.5px; font-weight:500; cursor:pointer; font-family:inherit;
   }
+  .action-btn:hover{border-color:var(--muted); color:var(--ink);}
   .action-btn.restore{background:var(--green); color:#fff; border-color:var(--green);}
-  .action-btn.fail{background:transparent;}
 
-  .diag-card{
-    background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius);
-    padding:16px 18px; margin-bottom:12px;
+  /* ---------- panels ---------- */
+  .panel, .chart-card, .nd-card, .diag-card, .rain-card{
+    background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:18px 20px; min-width:0;
   }
-  .diag-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:8px;}
-  .diag-grade{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:5px 12px;border-radius:999px;}
+  .panel h4, .chart-card h4{font-size:14px; margin:0 0 2px; font-weight:600; letter-spacing:-0.015em;}
+  .panel .c-sub, .chart-card .c-sub{font-size:12px; color:var(--muted); margin-bottom:12px;}
+
+  .diag-card{margin-bottom:10px;}
+  .diag-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;}
+  .diag-grade{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:5px 13px;border-radius:999px;}
   .diag-grade.good{background:var(--green-bg);color:var(--green);}
   .diag-grade.fair{background:var(--amber-bg);color:var(--amber);}
   .diag-grade.poor{background:var(--red-bg);color:var(--red);}
-  .diag-time{font-size:11px; color:var(--muted);}
-  .diag-lines{display:flex; flex-direction:column; gap:6px; margin-bottom:10px;}
-  .diag-line{display:flex; gap:8px; font-size:12px; align-items:flex-start;}
+  .diag-time{font-size:12px; color:var(--muted);}
+  .diag-lines{display:flex; flex-direction:column; gap:7px; margin-bottom:12px;}
+  .diag-line{display:flex; gap:9px; font-size:12.5px; align-items:flex-start; color:var(--ink-soft);}
   .diag-line .dl-dot{width:7px;height:7px;border-radius:50%;flex:none;margin-top:5px;}
-  .diag-line.ok .dl-dot{background:var(--green);}
+  .diag-line.ok .dl-dot{background:var(--accent);}
   .diag-line.warn .dl-dot{background:var(--amber);}
   .diag-line.bad .dl-dot{background:var(--red);}
-  .diag-rec{background:var(--bg-soft); border-radius:var(--radius-sm); padding:10px 12px; font-size:12px; color:var(--ink-soft); line-height:1.6;}
-  .diag-rec ul{margin:4px 0 0; padding-left:16px;}
-  .diag-empty{text-align:center; color:var(--muted); font-size:12.5px; padding:30px 10px;}
+  .diag-rec{background:var(--bg-soft); border-radius:var(--radius-sm); padding:12px 14px; font-size:12.5px; color:var(--ink-soft); line-height:1.6;}
+  .diag-rec ul{margin:4px 0 0; padding-left:17px;}
+  .diag-empty{text-align:center; color:var(--muted); font-size:13px; padding:34px 10px; background:var(--card);
+    border:1px solid var(--card-border); border-radius:var(--radius);}
 
-  /* charts */
-  .chart-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:12px;}
+  /* ---------- charts ---------- */
+  /* Two even columns with the odd card out spanning both, rather than
+     auto-fit leaving a half-width orphan on the last row. */
+  .chart-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px;}
   .chart-grid > *{min-width:0;}
-  .chart-card{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:14px 16px;}
-  .chart-card h4{font-size:12px; font-weight:600; margin:0 0 1px;}
-  .chart-card .c-sub{font-size:10.5px; color:var(--muted); margin-bottom:8px;}
-  .chart-card canvas{max-height:200px; max-width:100%;}
+  .chart-grid > *:last-child:nth-child(odd){grid-column:1/-1;}
+  @media (max-width:900px){ .chart-grid{grid-template-columns:1fr;} }
+  .chart-card canvas{max-height:190px; max-width:100%;}
+  .chart-legend{display:flex; gap:16px; margin-top:12px; flex-wrap:wrap; padding-left:2px;}
+  .chart-legend .li{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);font-weight:450;}
+  .chart-legend i{width:8px;height:8px;border-radius:50%;display:inline-block;}
 
-  /* ---- flood prediction ---- */
-  .predict-wrap{display:grid; grid-template-columns:minmax(300px,0.85fr) 1.15fr; gap:12px; align-items:stretch;}
+  /* ---------- advisory ---------- */
+  .advisory{display:grid; grid-template-columns:1.1fr .9fr; gap:12px;}
+  @media (max-width:900px){ .advisory{grid-template-columns:1fr;} }
+  .adv-col{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:18px 20px; min-width:0;}
+  .adv-sms{font-size:15px; line-height:1.6; color:var(--ink); font-weight:450; letter-spacing:-0.01em;}
+  .adv-sms.warn{color:var(--amber);} .adv-sms.bad{color:var(--red);}
+  .adv-tech{font-size:12.5px; color:var(--ink-soft); line-height:1.65;}
+  .adv-tech ul{margin:0; padding-left:16px;}
+  .adv-tech li{margin-bottom:4px;}
+  .adv-tech b{font-variant-numeric:tabular-nums; color:var(--ink); font-weight:600;}
+
+  /* ---------- flood prediction ---------- */
+  .predict-wrap{display:grid; grid-template-columns:minmax(300px,.8fr) 1.2fr; gap:12px; align-items:stretch;}
   .predict-wrap > *{min-width:0;}
-  @media (max-width:1000px){ .predict-wrap{grid-template-columns:1fr;} }
+  @media (max-width:1040px){ .predict-wrap{grid-template-columns:1fr;} }
   .predict-map-panel{display:flex; flex-direction:column;}
-  .predict-map-panel #map{flex:1; min-height:280px; height:auto;}
-  .map-legend{display:flex; flex-wrap:wrap; gap:12px; margin-top:9px; font-size:10.5px; color:var(--muted);}
-  .map-legend i{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align:baseline;}
-  .predict-head{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:12px;}
+  .predict-map-panel #map{flex:1; min-height:300px; height:auto;}
+  .map-legend{display:flex; flex-wrap:wrap; gap:14px; margin-top:12px; font-size:12px; color:var(--muted);}
+  .map-legend i{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:baseline;}
+  .predict-head{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:14px;}
   .node-chips{display:flex; gap:5px; flex-wrap:wrap;}
   .node-chip{
     background:transparent; border:1px solid var(--card-border); color:var(--ink-soft);
-    padding:4px 10px; border-radius:var(--radius-sm); font-size:11px; font-weight:500;
-    cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:6px;
+    padding:5px 12px; border-radius:999px; font-size:12px; font-weight:450;
+    cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:7px;
   }
   .node-chip:hover{border-color:var(--muted); color:var(--ink);}
   .node-chip.active{background:var(--ink); color:var(--card); border-color:var(--ink);}
   .node-chip i{width:7px; height:7px; border-radius:50%; flex:none;}
   .predict-empty{
-    color:var(--muted); font-size:12px; line-height:1.6; padding:34px 18px;
-    text-align:center; border:1px dashed var(--card-border); border-radius:var(--radius);
+    color:var(--muted); font-size:13px; line-height:1.6; padding:40px 18px;
+    text-align:center; background:var(--bg-soft); border-radius:var(--radius-sm);
   }
-  /* A rule and a coloured figure carry the state. A filled panel per severity
-     turns a readout into a status light. */
-  .verdict{
-    display:flex; gap:18px; align-items:baseline;
-    padding:2px 0 15px; margin-bottom:2px; border-bottom:1px solid var(--line);
-  }
-  .verdict .v-eta{font-family:var(--mono); font-size:26px; font-weight:600; line-height:1; white-space:nowrap; letter-spacing:-.02em; min-width:104px;}
+  .verdict{display:flex; gap:20px; align-items:baseline; padding:2px 0 16px; margin-bottom:14px; border-bottom:1px solid var(--line);}
+  .verdict .v-eta{font-size:30px; font-weight:600; line-height:1; white-space:nowrap; letter-spacing:-.035em; min-width:104px; font-variant-numeric:tabular-nums;}
   .verdict.calm .v-eta{color:var(--ink);} .verdict.watch .v-eta{color:var(--amber);} .verdict.urgent .v-eta{color:var(--red);}
-  .verdict .v-text{font-size:12.5px; line-height:1.6; color:var(--ink-soft);}
-  .verdict .v-text b{color:var(--ink);}
-  /* Fixed 7 across so the row never orphans a stretched last cell. */
-  .predict-metrics{display:grid; grid-template-columns:repeat(7,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--radius-sm); overflow:hidden; margin-bottom:12px;}
+  .verdict .v-text{font-size:13px; line-height:1.6; color:var(--ink-soft);}
+  .verdict .v-text b{color:var(--ink); font-weight:600;}
+  .predict-metrics{display:grid; grid-template-columns:repeat(7,1fr); gap:10px; margin-bottom:14px;}
   @media (max-width:1180px){ .predict-metrics{grid-template-columns:repeat(4,1fr);} }
   @media (max-width:640px){ .predict-metrics{grid-template-columns:repeat(2,1fr);} }
-  .pm{background:var(--card); padding:10px 11px; min-width:0;}
-  .pm .k{font-size:9px; text-transform:uppercase; letter-spacing:.5px; color:var(--muted); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .pm .v{font-family:var(--mono); font-size:16px; font-weight:600; margin-top:3px; font-variant-numeric:tabular-nums; line-height:1.25;}
-  .pm .s{font-size:9.5px; color:var(--muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .predict-chart-box{height:190px; margin-bottom:10px; min-width:0; position:relative;}
+  .pm{background:var(--bg-soft); border-radius:var(--radius-xs); padding:10px 12px; min-width:0;}
+  .pm .k{font-size:11.5px; color:var(--muted); font-weight:450; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .pm .v{font-size:17px; font-weight:600; margin-top:3px; font-variant-numeric:tabular-nums; line-height:1.25; letter-spacing:-.03em;}
+  .pm .s{font-size:11px; color:var(--muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .predict-chart-box{height:200px; margin-bottom:12px; min-width:0; position:relative;}
   .predict-chart-box canvas{position:absolute; inset:0; width:100%!important; height:100%!important;}
-  .predict-note{font-size:10.5px; color:var(--muted); line-height:1.6; border-top:1px solid var(--line); padding-top:9px;}
-  .cascade{display:flex; align-items:center; flex-wrap:wrap; gap:0; margin-bottom:14px;
-    border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
-  .cs{
-    font-family:var(--mono); font-size:11px; padding:7px 14px; color:var(--muted);
-    border-right:1px solid var(--line); white-space:nowrap;
-  }
-  .cs:last-child{border-right:none;}
+  .cascade{display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:16px;}
+  .cs{font-size:11.5px; padding:5px 12px; color:var(--muted); background:var(--bg-soft); border-radius:999px; white-space:nowrap;}
   .cs.due{color:var(--ink-soft);}
-  .cs.on{color:var(--ink); font-weight:600;}
-  /* Marks a value that came from literature rather than our own bench tests. */
-  /* Marks a figure taken from literature rather than our own bench tests.
-     Kept, because the brief requires estimated values to be distinguishable,
-     but set as a quiet footnote rather than a coloured tag. */
-  .est{font-family:var(--mono); font-size:9.5px; color:var(--muted); font-style:italic;}
+  .cs.on{background:var(--ink); color:var(--card); font-weight:550;}
+  /* Marks a figure taken from literature rather than our own bench tests. */
+  .est{font-size:11px; color:var(--muted); font-style:italic;}
 
-  /* ---- per-node detail cards ---- */
+  /* ---------- per-node cards ---------- */
   /* Grid items default to min-width:auto, which lets a canvas's intrinsic
      width push the track wider than 1fr and overflow the page. Every level
      that wraps a chart has to opt out of that. */
-  .node-detail-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:12px;}
+  .node-detail-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:12px;}
   .node-detail-grid > *{min-width:0;}
-  .nd-card{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:14px 16px; min-width:0; overflow:hidden;}
-  .nd-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px;}
-  .nd-name{font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:7px;}
+  .nd-card{overflow:hidden;}
+  .nd-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:14px;}
+  .nd-name{font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px; letter-spacing:-0.015em;}
   .nd-name i{width:8px; height:8px; border-radius:50%; flex:none;}
-  .nd-sub{font-size:10.5px; color:var(--muted); margin-top:2px; font-family:var(--mono);}
-  /* Health index: the number is the point, so it gets display size and a
-     band rule underneath rather than another chart to read. */
+  .nd-sub{font-size:11.5px; color:var(--muted); margin-top:3px;}
   .nd-health{text-align:right; flex:none;}
-  .nd-health .h-val{font-family:var(--mono); font-size:19px; font-weight:600; line-height:1; font-variant-numeric:tabular-nums; color:var(--ink);}
-  .nd-health .h-lab{font-size:10px; color:var(--muted); margin-top:4px;}
+  .nd-health .h-val{font-size:23px; font-weight:600; line-height:1; font-variant-numeric:tabular-nums; color:var(--ink); letter-spacing:-.035em;}
+  .nd-health .h-lab{font-size:11.5px; color:var(--muted); margin-top:5px;}
   .nd-health.mid .h-val{color:var(--amber);} .nd-health.bad .h-val{color:var(--red);}
-  .nd-bar{display:none;}
-  .nd-bar .f{height:100%; border-radius:2px; transition:width .3s;}
-  .nd-bar .f.good{background:var(--green);} .nd-bar .f.mid{background:var(--amber);} .nd-bar .f.bad{background:var(--red);}
-  .nd-charts{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .nd-charts{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
   .nd-charts > *{min-width:0;}
   @media (max-width:520px){ .nd-charts{grid-template-columns:1fr;} }
-  .nd-chart h5{font-size:10px; font-weight:600; margin:0 0 1px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.5px;}
-  .nd-chart .nd-cs{font-size:9.5px; color:var(--muted); margin-bottom:5px; font-family:var(--mono);}
+  .nd-chart h5{font-size:12px; font-weight:500; margin:0 0 1px; color:var(--muted); letter-spacing:0;}
+  .nd-chart .nd-cs{font-size:11.5px; color:var(--ink-soft); margin-bottom:6px; font-variant-numeric:tabular-nums;}
   .nd-chart-box{height:84px; min-width:0; position:relative;}
   .nd-chart-box canvas{position:absolute; inset:0; width:100%!important; height:100%!important;}
-  .nd-foot{display:flex; gap:14px; flex-wrap:wrap; margin-top:11px; padding-top:9px; border-top:1px solid var(--line); font-size:10.5px; color:var(--muted);}
-  .nd-foot b{font-family:var(--mono); color:var(--ink-soft); font-weight:600;}
-  .chart-legend{display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;}
-  .chart-legend .li{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--ink-soft);font-weight:600;}
-  .chart-legend i{width:8px;height:8px;border-radius:2px;display:inline-block;}
 
-  .rain-card{
-    background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius);
-    padding:20px 22px; margin-bottom:14px;
-  }
-  .rain-head{display:flex; align-items:center; gap:10px; margin-bottom:16px; flex-wrap:wrap;}
+  /* ---------- rain ---------- */
+  .rain-head{display:flex; align-items:center; gap:10px; margin-bottom:18px; flex-wrap:wrap;}
   .rain-head .rh-icon{display:none;}
-  .rain-head .rh-icon svg{width:18px;height:18px;}
-  .rain-head h3{font-size:13.5px; font-weight:600;}
-  /* Dial, then the readings as compact cells, then the caveat — rather than
-     four rows stretched the full width with the values stranded at the edge. */
-  .rain-body{display:grid; grid-template-columns:auto auto 1fr; gap:24px; align-items:center;}
-  @media (max-width:980px){ .rain-body{grid-template-columns:auto 1fr;} .rain-body .rain-note{grid-column:1/-1;} }
-  @media (max-width:720px){ .rain-body{grid-template-columns:1fr; justify-items:start;} }
-  .rain-headline{flex:none; min-width:88px;}
-  .rain-headline .rgd-value{font-family:var(--mono); font-size:26px; font-weight:600; line-height:1;}
-  .rain-headline .rgd-label{font-size:9px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin-top:4px;}
-  .rain-gauge-dial{
-    width:96px; height:96px; border-radius:50%; flex:none; position:relative;
-    background: conic-gradient(var(--gauge-color, var(--purple)) calc(var(--gauge-val, 0)*1%), var(--card-border) 0);
-  }
-  /* ::after is the last child, so without an explicit z-index it paints over
-     .rgd-inner and hides the readout entirely. */
-  .rain-gauge-dial::after{ content:""; position:absolute; inset:9px; border-radius:50%; background:var(--card); z-index:0; }
-  .rain-gauge-dial .rgd-inner{
-    position:absolute; inset:0; z-index:1;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-  }
-  .rain-gauge-dial .rgd-value{position:relative; font-family:var(--mono); font-size:20px; font-weight:600; line-height:1; font-variant-numeric:tabular-nums;}
-  .rain-gauge-dial .rgd-label{position:relative; font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px; margin-top:3px;}
-  .rain-stats{display:grid; grid-template-columns:repeat(4,minmax(0,140px)); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--radius-sm); overflow:hidden;}
+  .rain-head h3{font-size:14px; font-weight:600; letter-spacing:-0.015em;}
+  .rain-body{display:grid; grid-template-columns:auto 1fr; gap:28px; align-items:center;}
+  @media (max-width:720px){ .rain-body{grid-template-columns:1fr; justify-items:start; gap:18px;} }
+  .rain-headline{flex:none; min-width:96px;}
+  .rain-headline .rgd-value{font-size:32px; font-weight:600; line-height:1; font-variant-numeric:tabular-nums; letter-spacing:-.035em;}
+  .rain-headline .rgd-label{font-size:12px; color:var(--muted); margin-top:6px;}
+  .rain-stats{display:grid; grid-template-columns:repeat(4,minmax(0,150px)); gap:10px;}
   @media (max-width:720px){ .rain-stats{grid-template-columns:repeat(2,1fr); width:100%;} }
-  .rain-stat-row{display:flex; flex-direction:column; gap:3px; background:var(--card); padding:9px 11px; min-width:0;}
-  .rain-stat-row .rs-label{color:var(--muted); font-size:9px; text-transform:uppercase; letter-spacing:.5px; font-weight:600;}
-  .rain-stat-row .rs-value{font-weight:600; font-size:13.5px; font-family:var(--mono); color:var(--ink); font-variant-numeric:tabular-nums;}
-  .rain-trend{display:inline-flex; align-items:center; gap:4px; font-weight:600;}
-  .rain-trend svg{width:12px;height:12px;}
-  .rain-trend.up{color:var(--purple);}
+  .rain-stat-row{display:flex; flex-direction:column; gap:4px; background:var(--bg-soft); border-radius:var(--radius-xs); padding:10px 12px; min-width:0;}
+  .rain-stat-row .rs-label{color:var(--muted); font-size:11.5px; font-weight:450;}
+  .rain-stat-row .rs-value{font-weight:600; font-size:15px; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-.025em;}
+  .rain-trend{display:inline-flex; align-items:center; gap:5px; font-weight:600;}
+  .rain-trend svg{width:13px;height:13px;}
+  .rain-trend.up{color:var(--water);}
   .rain-trend.down{color:var(--green);}
   .rain-trend.flat{color:var(--muted);}
-  .rain-note{font-size:10.5px; color:var(--muted); line-height:1.6; max-width:34ch;}
 
-  .split{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .split{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
   @media (max-width:1000px){ .split{grid-template-columns:1fr;} }
-  .panel{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:16px 18px;}
-  .panel h4{font-size:12.5px; margin:0 0 2px; font-weight:700;}
-  .panel .c-sub{font-size:10.5px; color:var(--muted); margin-bottom:10px;}
 
-  #map{height:280px;border-radius:var(--radius-sm);overflow:hidden;border:1px solid var(--card-border);filter:var(--map-filter);}
+  #map{height:300px;border-radius:var(--radius-sm);overflow:hidden;border:1px solid var(--line);filter:var(--map-filter);}
 
   .console{
-    background:#181d17; color:#c9d6c5; border-radius:var(--radius-sm);
-    height:280px; overflow-y:auto; padding:10px 12px; font-family:var(--mono); font-size:10.8px;
+    background:#131a17; color:#c6d4ca; border-radius:var(--radius-sm);
+    height:290px; overflow-y:auto; padding:12px 14px; font-family:var(--mono); font-size:11px;
     display:flex; flex-direction:column-reverse;
   }
-  .console .line{padding:2px 0; border-bottom:1px dashed #2c332a; line-height:1.5;}
-  .console .line .ts{color:#7d8a78; margin-right:6px;}
-  .console .line.rx{color:#9fd6b8;}
-  .console .line.relay{color:#e0b968;}
-  .console .line.cloud{color:#8fb6d8;}
-  .console .line.state{color:#c6b3e8;}
+  .console .line{padding:3px 0; line-height:1.55;}
+  .console .line .ts{color:#6f7d74; margin-right:7px;}
+  .console .line.rx{color:#8fd4af;}
+  .console .line.relay{color:#dcb867;}
+  .console .line.cloud{color:#8bb4d8;}
+  .console .line.state{color:#c3b1e8;}
   .console .line.sms{color:#e0897a; font-weight:600;}
-  .console .line.rain{color:#8fd0e8;}
+  .console .line.rain{color:#8bcde8;}
 
-  .cal-status{display:inline-flex;align-items:center;gap:6px;font-size:11px;background:var(--amber-bg);color:var(--amber);padding:5px 10px;border-radius:999px;margin-top:8px;}
+  .cal-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;background:var(--amber-bg);color:var(--amber);padding:6px 12px;border-radius:999px;margin-top:10px;}
 
-  .weather-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:8px;}
-  .weather-stat{background:var(--bg-soft);border-radius:8px;padding:9px 11px;}
-  .weather-stat .ws-label{font-size:9.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;}
-  .weather-stat .ws-value{font-size:15px;font-weight:600;font-family:var(--mono);font-variant-numeric:tabular-nums;margin-top:3px;}
-  .weather-loading,.weather-error{text-align:center;padding:26px 14px;color:var(--muted);font-size:12px;}
+  .weather-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px;}
+  .weather-stat{background:var(--bg-soft);border-radius:var(--radius-xs);padding:11px 13px;}
+  .weather-stat .ws-label{font-size:11.5px;color:var(--muted);font-weight:450;}
+  .weather-stat .ws-value{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:4px;letter-spacing:-.03em;}
+  .weather-loading,.weather-error{text-align:center;padding:28px 14px;color:var(--muted);font-size:12.5px;}
 
-  footer{margin-top:24px;padding-top:14px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--muted);}
-  .btn{background:var(--ink);color:#fbf8ef;border:none;padding:8px 15px;border-radius:8px;font-weight:600;font-size:12px;cursor:pointer;}
-  .btn.ghost{background:transparent;border:1px solid var(--card-border);color:var(--muted);}
+  /* ---------- provenance ---------- */
+  .prov{display:grid; grid-template-columns:repeat(4,1fr); gap:24px;}
+  @media (max-width:980px){ .prov{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:600px){ .prov{grid-template-columns:1fr;} }
+  .prov-col h5{font-size:12.5px; font-weight:600; margin:0 0 8px; display:flex; align-items:center; gap:7px;}
+  .prov-col h5::before{content:""; width:7px; height:7px; border-radius:50%; background:var(--muted);}
+  .prov-col h5.ok::before{background:var(--accent);}
+  .prov-col h5.est-h::before{background:var(--water);}
+  .prov-col h5.warn-h::before{background:var(--amber);}
+  .prov-col h5.sim-h::before{background:var(--purple);}
+  .prov-col ul{margin:0; padding-left:16px; font-size:12.5px; color:var(--ink-soft); line-height:1.75;}
+  .prov-col .pv{color:var(--muted); font-size:11.5px;}
+  .prov-col p{font-size:11.5px; color:var(--muted); line-height:1.6; margin:9px 0 0;}
+
+  footer{margin-top:28px;padding-top:16px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted);}
+  .btn{background:var(--ink);color:var(--card);border:none;padding:8px 16px;border-radius:999px;font-weight:550;font-size:12.5px;cursor:pointer;font-family:inherit;}
+  .btn.ghost{background:transparent;border:1px solid var(--card-border);color:var(--ink-soft);}
 </style>
 </head>
 <body>
-<div class="wrap">
 
-  <header>
-    <div class="brand">
-      <div class="brand-mark"><svg viewBox="0 0 24 24"><path d="M4 17h16M4 12h16M4 7h16"/></svg></div>
-      <div>
-        <h1>FMS Dev Console</h1>
-        
-      </div>
-    </div>
-    <div class="header-right">
-      <a class="pill" href="forecast.html" style="text-decoration:none; border-color:var(--water); color:var(--water); font-weight:600;">Field Forecast &rarr;</a>
-      <div class="pill"><span id="clock"></span></div>
-      <button class="icon-btn" id="theme-toggle" title="Switch light / dark">
-        <svg class="icon-sun" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M2.5 12h2.6M18.9 12h2.6M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/></svg>
-        <svg class="icon-moon" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>
-      </button>
-    </div>
-  </header>
+<aside class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-mark"><svg viewBox="0 0 24 24"><path d="M12 3.5c3.4 3.3 5.2 6 5.2 8.4a5.2 5.2 0 0 1-10.4 0c0-2.4 1.8-5.1 5.2-8.4Z"/><path d="M9.6 12.6a2.6 2.6 0 0 0 2.6 2.6"/></svg></div>
+    <b>FMS Center</b>
+  </div>
 
-  <div class="controls-bar">
-    
-    <button data-speed="0">Pause</button>
-    <button data-speed="1">1×</button>
-    <button data-speed="4">4×</button>
-    <button data-speed="15" class="active">15×</button>
-    <button data-speed="40">40×</button>
+  <nav class="sb-nav" id="sb-nav">
+    <a href="#overview"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10.5V20h12v-9.5"/></svg>Overview</a>
+    <a href="#prediction"><svg viewBox="0 0 24 24"><path d="M3 17l5.5-6 4 3.5L21 6"/><path d="M16 6h5v5"/></svg>Prediction</a>
+    <a href="#nodes"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 10h17M9 10v9"/></svg>Nodes</a>
+    <a href="#sensors"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>Sensors</a>
+    <a href="#rainfall"><svg viewBox="0 0 24 24"><path d="M17 14a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.6 1.7A4 4 0 0 0 7 16h10Z"/><path d="M9 19v1.5M12 19v2.5M15 19v1.5"/></svg>Rainfall</a>
+    <a href="#trends"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V5M16 20v-7M22 20H2"/></svg>Trends</a>
+    <a href="#activity"><svg viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 13 2.5-7h5"/></svg>Activity</a>
+    <a href="#weather"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.4M12 19.1v2.4M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.9 19.1l1.7-1.7M17.4 6.6l1.7-1.7"/></svg>Weather</a>
+    <a href="#diagnostics"><svg viewBox="0 0 24 24"><path d="M9.5 4.5 5 9l3 3 4.5-4.5a4 4 0 0 1 5.5-5.5l-3 3 2 2 3-3a4 4 0 0 1-5.5 5.5"/><path d="m10 14-6 6"/></svg>Diagnostics</a>
+    <a href="#calibration"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="17" r="2"/></svg>Calibration</a>
+    <a href="#reference"><svg viewBox="0 0 24 24"><path d="M5 4.5h10a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2Z"/><path d="M17 6.5h2v13H7"/></svg>Reference</a>
+  </nav>
+
+  <div class="sb-foot">
+    <a href="forecast.html"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.2 7-10.5a7 7 0 1 0-14 0C5 15.8 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.5"/></svg><span>Field forecast</span></a>
+    <button id="theme-toggle" title="Switch light / dark">
+      <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M2.5 12h2.6M18.9 12h2.6M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>
+      <span>Appearance</span>
+    </button>
+  </div>
+</aside>
+
+<main class="main">
+
+  <div class="page-head">
+    <h1>Field overview</h1>
+    <div class="head-right">
+      <div class="hpill" id="link-pill"><i></i><span>—</span></div>
+      <div class="hpill" id="mode-pill"><i></i><span id="mode-label">Simulated</span></div>
+      <div class="hpill"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></svg><span id="clock"></span></div>
+    </div>
+  </div>
+
+  <div class="toolbar controls-bar">
+    <div class="seg">
+      <button data-speed="0">Pause</button>
+      <button data-speed="1">1×</button>
+      <button data-speed="4">4×</button>
+      <button data-speed="15" class="active">15×</button>
+      <button data-speed="40">40×</button>
+    </div>
     <span class="spacer"></span>
-    <button id="live-btn">Live feed</button>
-    <button id="run-demo">Run sequence</button>
-    <button id="trigger-flood">Trigger flood</button>
-    <button id="trigger-storm">Trigger storm</button>
-    <button id="run-diagnostic">Run diagnostic</button>
-    <button id="toggle-signal">Weak signal</button>
+    <button class="tbtn" id="live-btn">Live feed</button>
+    <button class="tbtn" id="run-demo">Run sequence</button>
+    <button class="tbtn" id="trigger-flood">Trigger flood</button>
+    <button class="tbtn" id="trigger-storm">Trigger storm</button>
+    <button class="tbtn" id="run-diagnostic">Run diagnostic</button>
+    <button class="tbtn" id="toggle-signal">Weak signal</button>
   </div>
 
-  <div class="lead-band">
-  <div class="section-title">
-    <h2>Flood prediction</h2>
-  </div>
-  <div class="predict-wrap">
-    <div class="panel predict-map-panel">
-      <h4>Field Map</h4>
-            <div id="map"></div>
-      <div class="map-legend">
-        <span><i style="background:var(--green)"></i>Normal</span>
-        <span><i style="background:var(--amber)"></i>Watching</span>
-        <span><i style="background:var(--red)"></i>Alerted</span>
-        <span><i style="background:var(--muted)"></i>Offline</span>
-        <span><i style="background:var(--purple)"></i>Rain gauge (planned)</span>
-      </div>
-    </div>
-    <div class="panel predict-panel">
-      <div class="predict-head">
-        <div>
-          <h4 id="predict-title">No node selected</h4>
-          <div class="c-sub" id="predict-sub">Pick a marker on the map, or a node below.</div>
+  <section id="overview">
+    <div class="stat-grid" id="fleet-stats"></div>
+  </section>
+
+  <section id="prediction">
+    <div class="section-title"><h2>Flood prediction</h2></div>
+    <div class="predict-wrap">
+      <div class="panel predict-map-panel">
+        <h4>Field map</h4>
+        <div class="c-sub">Three nodes across the paddy block.</div>
+        <div id="map"></div>
+        <div class="map-legend">
+          <span><i style="background:var(--accent)"></i>Normal</span>
+          <span><i style="background:var(--amber)"></i>Watching</span>
+          <span><i style="background:var(--red)"></i>Alerted</span>
+          <span><i style="background:var(--muted)"></i>Offline</span>
+          <span><i style="background:var(--purple)"></i>Rain gauge (planned)</span>
         </div>
-        <div class="node-chips" id="node-chips"></div>
       </div>
-      <div id="predict-body">
-        <div class="predict-empty">Select a node to project its soil and water trend forward and cross-check it against the live regional forecast.</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="section-title">
-    <h2>Advisory</h2>
-  </div>
-  <div class="advisory" id="advisory">
-    <div class="adv-col">
-      
-      <div class="adv-sms" id="adv-sms">—</div>
-      
-    </div>
-    <div class="adv-col">
-      
-      <div class="adv-tech" id="adv-tech">—</div>
-    </div>
-  </div>
-
-  <div class="section-title"><h2>Fleet</h2></div>
-  <div class="stat-grid" id="fleet-stats"></div>
-
-  <div class="section-title"><h2>Nodes</h2></div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr>
-        <th>Node</th><th>Type</th><th>Link</th><th>State</th><th>Battery</th><th>Soil (raw)</th><th>Water (raw)</th>
-        <th>Health</th><th>Wetness %</th><th>Risk</th><th>Rate %/min</th><th>Debounce (over/under)</th>
-        <th>Packets</th><th>SMS sent</th><th>Last seen</th><th>Actions</th>
-      </tr></thead>
-      <tbody id="nodes-table"></tbody>
-    </table>
-  </div>
-
-  <div class="section-title"><h2>Rain gauge</h2></div>
-  <div class="rain-card">
-    <div class="rain-head">
-      <div class="rh-icon"><svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M17 15a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.6 1.7A4 4 0 0 0 7 17h10Z"/><path d="M9 19v1M12 19v2M15 19v1"/></svg></div>
-      <h3>Central Rain Gauge</h3>
-    </div>
-    <div class="rain-body">
-      <div class="rain-headline">
-        <div class="rgd-value" id="rain-pct">—</div>
-        <div class="rgd-label">intensity</div>
-      </div>
-      <div class="rain-stats">
-        <div class="rain-stat-row"><span class="rs-label">Raw ADC</span><span class="rs-value" id="rain-raw">—</span></div>
-        <div class="rain-stat-row"><span class="rs-label">State</span><span class="rs-value" id="rain-state">—</span></div>
-        <div class="rain-stat-row"><span class="rs-label">Trend</span><span class="rs-value" id="rain-trend">—</span></div>
-        <div class="rain-stat-row"><span class="rs-label">Last reading</span><span class="rs-value" id="rain-lastseen">—</span></div>
-      </div>
-      
-    </div>
-  </div>
-
-  <div class="section-title"><h2>Sensors</h2></div>
-  <div class="node-detail-grid" id="node-detail-grid"></div>
-
-  <div class="section-title"><h2>Charts</h2></div>
-  <div class="chart-grid">
-    <div class="chart-card"><h4>Soil Moisture — raw ADC</h4><canvas id="chart-soil"></canvas></div>
-    <div class="chart-card"><h4>Water Level — raw ADC</h4><canvas id="chart-water"></canvas></div>
-    <div class="chart-card"><h4>Soil Health Index</h4><canvas id="chart-health"></canvas></div>
-    <div class="chart-card"><h4>Flood Risk (composite)</h4><canvas id="chart-risk"></canvas></div>
-    <div class="chart-card"><h4>Rate of Change</h4><canvas id="chart-rate"></canvas></div>
-    <div class="chart-card"><h4>Rain Intensity — raw ADC <span class="row-badge planned">planned</span></h4><canvas id="chart-rain"></canvas></div>
-    <div class="chart-card"><h4>Battery — % <span class="row-badge planned">speculative</span></h4><canvas id="chart-battery"></canvas></div>
-  </div>
-  <div class="chart-legend" id="chart-legend"></div>
-
-  <div class="section-title"><h2>Diagnostics</h2></div>
-  <div id="diagnostic-history"><div class="diag-empty">No diagnostic run yet.</div></div>
-
-  <div class="section-title"><h2>Events</h2></div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th style="width:140px;">Time</th><th>Node</th><th>Event</th><th>Detail</th></tr></thead>
-      <tbody id="events-table"></tbody>
-    </table>
-  </div>
-
-  <div class="section-title"><h2>Weather</h2></div>
-  <div class="split">
-    <div class="panel">
-      <h4>Right now near the farm</h4>
-            <div id="weather-card"><div class="weather-loading">Fetching live weather…</div></div>
-    </div>
-  </div>
-
-  <div class="section-title"><h2>Packets</h2></div>
-  <div class="panel">
-    <div class="console" id="console"></div>
-  </div>
-
-  <div class="section-title"><h2>Calibration</h2></div>
-  <div class="panel">
-    <table>
-      <thead><tr><th>Category</th><th>n</th><th>Mean (raw)</th><th>Min</th><th>Max</th></tr></thead>
-      <tbody>
-        <tr><td class="n">Dry</td><td>5</td><td>875.0</td><td>837</td><td>895</td></tr>
-        <tr><td class="n">Saturated</td><td>5</td><td>385.4</td><td>361</td><td>418</td></tr>
-        <tr id="cal-fc-row"><td class="n">Field Capacity</td><td>0</td><td>—</td><td>—</td><td>—</td></tr>
-      </tbody>
-    </table>
-    <div class="cal-status" id="cal-status-note">Field-capacity leg incomplete — wetness %, risk score, and reset thresholds are all provisional until this finishes.</div>
-
-    <div style="margin-top:18px; padding-top:16px; border-top:1px dashed var(--line);">
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
-        <div>
-          <div style="font-weight:700; font-size:13px;">Field-Capacity Calibration Wizard</div>
-          <div style="font-size:11px; color:var(--muted); max-width:520px; margin-top:2px;">Mirrors the real d/f/s/n/a/r keypress protocol from <code>moisture_calibration_logger.ino</code>: soak the soil, let it gravity-drain 24–48h, then log 5 readings across 3 fresh-soil replicates (15 total). Readings here are simulated bench samples — not derived from any deployed field node.</div>
+      <div class="panel predict-panel">
+        <div class="predict-head">
+          <div>
+            <h4 id="predict-title">No node selected</h4>
+            <div class="c-sub" id="predict-sub">Pick a marker on the map, or a node below.</div>
+          </div>
+          <div class="node-chips" id="node-chips"></div>
         </div>
-        <button class="btn" id="cal-start-btn">Start calibration run</button>
+        <div id="predict-body">
+          <div class="predict-empty">Select a node to project its soil and water trend forward and cross-check it against the live regional forecast.</div>
+        </div>
       </div>
-      <div id="cal-progress" hidden>
-        <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:8px;">
-          <span>Replicate <b id="cal-rep">1</b>/3 — reading <b id="cal-reading">0</b>/5</span>
-          <span id="cal-live-stats" style="color:var(--muted); font-family:var(--mono);"></span>
+    </div>
+
+    <div class="section-title"><h2>Advisory</h2></div>
+    <div class="advisory" id="advisory">
+      <div class="adv-col"><div class="adv-sms" id="adv-sms">—</div></div>
+      <div class="adv-col"><div class="adv-tech" id="adv-tech">—</div></div>
+    </div>
+  </section>
+
+  <section id="nodes">
+    <div class="section-title"><h2>Nodes</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Node</th><th>Link</th><th>State</th><th>Battery</th><th>Soil</th><th>Water</th>
+          <th>Health</th><th>Risk</th><th>Last seen</th><th></th>
+        </tr></thead>
+        <tbody id="nodes-table"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="sensors">
+    <div class="section-title"><h2>Sensors</h2></div>
+    <div class="node-detail-grid" id="node-detail-grid"></div>
+  </section>
+
+  <section id="rainfall">
+    <div class="section-title"><h2>Rainfall</h2></div>
+    <div class="rain-card">
+      <div class="rain-head"><h3>Central rain gauge <span class="row-badge planned">planned</span></h3></div>
+      <div class="rain-body">
+        <div class="rain-headline">
+          <div class="rgd-value" id="rain-pct">—</div>
+          <div class="rgd-label">Intensity</div>
         </div>
-        <div class="battery-bar" style="width:100%; height:8px; margin-bottom:12px;"><div class="battery-fill" id="cal-progress-bar" style="width:0%;"></div></div>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          <button class="btn" id="cal-log-btn">Log reading (bench sample)</button>
-          <button class="btn ghost" id="cal-discard-btn">Discard run</button>
-          <button class="btn" id="cal-complete-btn" style="display:none; background:var(--green);">Complete calibration — write Field Capacity</button>
+        <div class="rain-stats">
+          <div class="rain-stat-row"><span class="rs-label">Raw ADC</span><span class="rs-value" id="rain-raw">—</span></div>
+          <div class="rain-stat-row"><span class="rs-label">State</span><span class="rs-value" id="rain-state">—</span></div>
+          <div class="rain-stat-row"><span class="rs-label">Trend</span><span class="rs-value" id="rain-trend">—</span></div>
+          <div class="rain-stat-row"><span class="rs-label">Last reading</span><span class="rs-value" id="rain-lastseen">—</span></div>
         </div>
-        <div class="table-wrap" style="margin-top:12px; max-height:160px; overflow-y:auto;">
-          <table style="min-width:0;">
-            <thead><tr><th>#</th><th>Replicate</th><th>Raw ADC</th></tr></thead>
-            <tbody id="cal-log-table"></tbody>
+      </div>
+    </div>
+  </section>
+
+  <section id="trends">
+    <div class="section-title"><h2>Trends</h2></div>
+    <div class="chart-grid">
+      <div class="chart-card"><h4>Soil moisture</h4><div class="c-sub">Raw ADC — falls as soil wets</div><canvas id="chart-soil"></canvas></div>
+      <div class="chart-card"><h4>Water level</h4><div class="c-sub">Raw ADC — rises as water stands</div><canvas id="chart-water"></canvas></div>
+      <div class="chart-card"><h4>Soil health index</h4><div class="c-sub">0–100, derived from soil moisture</div><canvas id="chart-health"></canvas></div>
+      <div class="chart-card"><h4>Flood risk</h4><div class="c-sub">Composite of wetness and water level</div><canvas id="chart-risk"></canvas></div>
+      <div class="chart-card"><h4>Rate of change</h4><div class="c-sub">Percent of scale per minute</div><canvas id="chart-rate"></canvas></div>
+    </div>
+    <div class="chart-legend" id="chart-legend"></div>
+  </section>
+
+  <section id="activity">
+    <div class="section-title"><h2>Activity</h2></div>
+    <div class="split">
+      <div class="panel">
+        <h4>Events</h4>
+        <div class="c-sub">State changes, alerts and faults.</div>
+        <div class="table-wrap" style="border:none; padding:0; max-height:320px; overflow-y:auto;">
+          <table>
+            <thead><tr><th style="width:92px;">Time</th><th>Node</th><th>Event</th><th>Detail</th></tr></thead>
+            <tbody id="events-table"></tbody>
           </table>
         </div>
       </div>
+      <div class="panel">
+        <h4>Packet log</h4>
+        <div class="c-sub">Radio traffic as the base station receives it.</div>
+        <div class="console" id="console"></div>
+      </div>
     </div>
-  </div>
+  </section>
 
-  <div class="section-title"><h2>Cost</h2></div>
-  <div class="panel">
+  <section id="weather">
+    <div class="section-title"><h2>Weather</h2></div>
+    <div class="panel">
+      <h4>Right now near the farm</h4>
+      <div class="c-sub">Live observation from Open-Meteo.</div>
+      <div id="weather-card"><div class="weather-loading">Fetching live weather…</div></div>
+    </div>
+  </section>
+
+  <section id="diagnostics">
+    <div class="section-title"><h2>Diagnostics</h2></div>
+    <div id="diagnostic-history"><div class="diag-empty">No diagnostic run yet.</div></div>
+  </section>
+
+  <section id="calibration">
+    <div class="section-title"><h2>Calibration</h2></div>
+    <div class="panel">
+      <table>
+        <thead><tr><th>Category</th><th>n</th><th>Mean (raw)</th><th>Min</th><th>Max</th></tr></thead>
+        <tbody>
+          <tr><td class="n">Dry</td><td>5</td><td>875.0</td><td>837</td><td>895</td></tr>
+          <tr><td class="n">Saturated</td><td>5</td><td>385.4</td><td>361</td><td>418</td></tr>
+          <tr id="cal-fc-row"><td class="n">Field capacity</td><td>0</td><td>—</td><td>—</td><td>—</td></tr>
+        </tbody>
+      </table>
+      <div class="cal-status" id="cal-status-note">Field-capacity leg incomplete — wetness, risk and reset thresholds are provisional.</div>
+
+      <div style="margin-top:20px; padding-top:18px; border-top:1px solid var(--line);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+          <div>
+            <h4>Field-capacity run</h4>
+            <div class="c-sub" style="margin:0; max-width:560px;">Soak, drain 24–48h, then log 5 readings across 3 replicates. Readings here are simulated bench samples.</div>
+          </div>
+          <button class="btn" id="cal-start-btn">Start run</button>
+        </div>
+        <div id="cal-progress" hidden>
+          <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:9px;">
+            <span>Replicate <b id="cal-rep">1</b>/3 — reading <b id="cal-reading">0</b>/5</span>
+            <span id="cal-live-stats" style="color:var(--muted); font-variant-numeric:tabular-nums;"></span>
+          </div>
+          <div class="battery-bar" style="width:100%; height:6px; margin-bottom:14px;"><div class="battery-fill" id="cal-progress-bar" style="width:0%;"></div></div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn" id="cal-log-btn">Log reading</button>
+            <button class="btn ghost" id="cal-discard-btn">Discard run</button>
+            <button class="btn" id="cal-complete-btn" style="display:none; background:var(--green);">Write field capacity</button>
+          </div>
+          <div class="table-wrap" style="margin-top:14px; max-height:170px; overflow-y:auto;">
+            <table>
+              <thead><tr><th>#</th><th>Replicate</th><th>Raw ADC</th></tr></thead>
+              <tbody id="cal-log-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="reference">
+    <div class="section-title"><h2>Cost</h2></div>
     <div class="stat-grid" id="economics-stats"></div>
-    <div style="font-size:11px; color:var(--muted); margin-top:12px; line-height:1.5;">$120/node is the project's cost <i>ceiling</i>, not yet a summed line-item total (HARDWARE.md's own "Known gaps" note) — no BOM with priced parts exists in the repo yet. $1,000 is used here as a round, conservative floor for commercial flood-telemetry hardware per the README's framing; real competitor pricing varies and isn't itemized in this repo either.</div>
-  </div>
+    <div style="font-size:11.5px; color:var(--muted); margin-top:10px; line-height:1.6; max-width:80ch;">$120/node is the project's cost ceiling, not a summed BOM — no priced parts list exists in the repo yet. $1,000 is a conservative floor for commercial flood telemetry, per the README's framing rather than quoted pricing.</div>
 
-  <div class="section-title"><h2>Provenance</h2></div>
-  <div class="panel prov">
-    <div class="prov-col">
-      <h5 class="ok">Measured</h5>
-      <ul>
-        <li>Dry soil 875.0 <span class="pv">SD 23.0, n=5</span></li>
-        <li>Flooded soil 385.4 <span class="pv">SD 25.1, n=5</span></li>
-        <li>Soil bands = mean ±2SD</li>
-      </ul>
-      <p>31 Aug 2026, round 1 of 3. One soil type, one node.</p>
+    <div class="section-title"><h2>Data provenance</h2></div>
+    <div class="panel prov">
+      <div class="prov-col">
+        <h5 class="ok">Measured</h5>
+        <ul>
+          <li>Dry soil 875.0 <span class="pv">SD 23.0, n=5</span></li>
+          <li>Flooded soil 385.4 <span class="pv">SD 25.1, n=5</span></li>
+          <li>Soil bands = mean ±2SD</li>
+        </ul>
+        <p>31 Aug 2026, round 1 of 3. One soil type, one node.</p>
+      </div>
+      <div class="prov-col">
+        <h5 class="est-h">Estimated</h5>
+        <ul>
+          <li>Healthy band 552–699 <span class="pv">clay-loam literature</span></li>
+          <li>Buffers: water 30, rain 980</li>
+          <li>Idle readings <span class="pv">observed, not logged</span></li>
+        </ul>
+        <p>Never present these as test results.</p>
+      </div>
+      <div class="prov-col">
+        <h5 class="warn-h">Not yet tested</h5>
+        <ul>
+          <li>Soil field capacity</li>
+          <li>Fast-drop rate <span class="pv">needs a real wetting event</span></li>
+          <li>Rain intensity, water depth</li>
+        </ul>
+        <p>Rain and water are on/off only. Fast-drop is excluded from the warning level until calibrated.</p>
+      </div>
+      <div class="prov-col">
+        <h5 class="sim-h">Simulated here</h5>
+        <ul>
+          <li>All node readings and scenarios</li>
+          <li>Battery, brownout, offline state</li>
+          <li>Rain gauge <span class="pv">no hardware exists</span></li>
+          <li>Cell signal, upload failures</li>
+        </ul>
+        <p>Flood prediction is dashboard-side. Base_code compares to a threshold and fires; it does not forecast.</p>
+      </div>
     </div>
-    <div class="prov-col">
-      <h5 class="est-h">Estimated</h5>
-      <ul>
-        <li>Healthy band 552–699 <span class="pv">clay-loam literature</span></li>
-        <li>Buffers: water 30, rain 980</li>
-        <li>Idle readings <span class="pv">observed, not logged</span></li>
-      </ul>
-      <p>Never present these as test results.</p>
-    </div>
-    <div class="prov-col">
-      <h5 class="warn-h">Not yet tested</h5>
-      <ul>
-        <li>Soil field capacity</li>
-        <li>Fast-drop rate <span class="pv">needs a real wetting event</span></li>
-        <li>Rain intensity, water depth</li>
-      </ul>
-      <p>Rain and water are on/off only. Fast-drop is excluded from the warning level until calibrated.</p>
-    </div>
-    <div class="prov-col">
-      <h5 class="sim-h">Simulated here</h5>
-      <ul>
-        <li>All node readings and scenarios</li>
-        <li>Battery, brownout, offline state</li>
-        <li>Rain gauge <span class="pv">no hardware exists</span></li>
-        <li>Cell signal, upload failures</li>
-      </ul>
-      <p>Flood prediction is dashboard-side. Base_code compares to a threshold and fires; it does not forecast.</p>
-    </div>
-  </div>
+  </section>
 
   <footer>
-    <div>FMS Dev Console · local, simulated telemetry · not connected to real hardware</div>
-    <button class="btn" id="export-csv">Download all raw data (CSV)</button>
+    <div>Local, simulated telemetry — not connected to real hardware.</div>
+    <button class="btn ghost" id="export-csv">Download raw data (CSV)</button>
   </footer>
 
-</div>
+</main>
 
 <script>
 /* =========================================================================
@@ -640,19 +694,20 @@ function effectiveTheme(){ return document.documentElement.getAttribute("data-th
 const GRAPHICS_OK = (typeof Chart !== "undefined");
 const MAP_OK = (typeof L !== "undefined");
 
-if (!GRAPHICS_OK){
-  // datasets is indexed by position (datasets[i].data = [...]), so an empty
-  // array would throw on the first write. Hand back a stub for any index.
+// datasets is indexed by position (datasets[i].data = [...]), so an empty
+// array would throw on the first write. Hand back a stub for any index.
+function stubChart(){
   const dsProxy = new Proxy([], {
     get: (t, k) => (typeof k === "string" && /^\d+$/.test(k))
       ? (t[k] || (t[k] = {data:[], borderColor:"", backgroundColor:""}))
       : Reflect.get(t, k)
   });
-  window.Chart = function(){
-    return { data:{labels:[], datasets:dsProxy},
-             options:{scales:{x:{}, y:{grid:{}}}, plugins:{}},
-             update(){}, destroy(){}, resize(){} };
-  };
+  return { data:{labels:[], datasets:dsProxy},
+           options:{scales:{x:{}, y:{grid:{}}}, plugins:{}},
+           update(){}, destroy(){}, resize(){} };
+}
+if (!GRAPHICS_OK){
+  window.Chart = function(){ return stubChart(); };
   window.Chart.defaults = {color:"", borderColor:"", font:{}};
 }
 if (!MAP_OK){
@@ -1180,54 +1235,81 @@ function statusMeta(state){
   return {cls:"", label:"Safe"};
 }
 
+/* A delta against the fleet's own recent history, not an invented trend:
+   the mean across reporting nodes of (latest reading - the reading
+   `back` steps earlier), as a percentage. Nodes without that much history
+   are skipped, and with none the tile simply shows no badge. */
+const DELTA_WINDOW = 12;
+function fleetDelta(pick, back){
+  const src = (liveMode ? nodes.filter(n=>n.history.length) : nodes);
+  const ds = [];
+  src.forEach(n=>{
+    const h = n.history;
+    if (h.length < back+1) return;
+    const now = pick(h[h.length-1]), then = pick(h[h.length-1-back]);
+    if (!isFinite(now) || !isFinite(then) || then === 0) return;
+    ds.push((now-then)/Math.abs(then)*100);
+  });
+  return ds.length ? ds.reduce((x,y)=>x+y,0)/ds.length : null;
+}
+// `goodUp` says which direction is an improvement, so a falling battery reads
+// red and a falling flood risk reads green. Pass null where neither direction
+// is better -- raw soil moisture rising means drying, which is good for a
+// waterlogged field and bad for a dry one, so it gets no colour at all.
+function deltaBadge(pct, goodUp){
+  if (pct === null || Math.abs(pct) < 0.5) return "";
+  const cls = goodUp === null ? "" : (pct > 0) === goodUp ? "up" : "down";
+  return `<span class="st-delta ${cls}">${pct>0?"+":""}${pct.toFixed(0)}%</span>`;
+}
+
 function renderFleetStats(){
   const offlineNodes = nodes.filter(isOffline);
   const online = nodes.length - offlineNodes.length;
   const alerted = nodes.filter(n=>!isOffline(n) && n.state==="ALERTED").length;
   const watching = nodes.filter(n=>!isOffline(n) && n.state==="WATCHING").length;
-  const totalPackets = nodes.reduce((s,n)=>s+n.packets,0) + rainNode.packets;
-  const totalSms = nodes.reduce((s,n)=>s+n.smsCount,0);
   // In live mode a node with no history has no reading to average; including
   // its stale simulated value would blend real and invented data.
   const reporting = liveMode ? nodes.filter(n=>n.history.length) : nodes;
   const avg = (fn)=> reporting.length
     ? reporting.reduce((s,n)=>s+fn(n),0)/reporting.length : 0;
-  const avgSoil = avg(n=>n.soil).toFixed(0);
-  const avgWater = avg(n=>n.water).toFixed(0);
   const last = n => n.history[n.history.length-1];
+  const avgSoil = avg(n=>n.soil).toFixed(0);
   const avgHealth = avg(n=>{const l=last(n); return l?l.health:calculateSoilHealth(n.soil);}).toFixed(0);
   const avgRisk = avg(n=>{const l=last(n); return l?l.risk:0;}).toFixed(0);
   const avgBattery = avg(n=>n.battery).toFixed(0);
   const lowBatteryCount = nodes.filter(n=>n.battery<=BATTERY_LOW_PCT).length;
-  const cooldownActive = lastSmsSimTime !== 0 && (simClock - lastSmsSimTime) < SMS_COOLDOWN_SIM_MS;
-  const cooldownMin = cooldownActive ? Math.max(1, Math.ceil((SMS_COOLDOWN_SIM_MS - (simClock - lastSmsSimTime))/60000)) : 0;
+  const none = reporting.length === 0;
+
+  // The cellular link has no tile of its own any more; it lives in the page
+  // header, where the "Weak signal" control still has somewhere to show.
+  const linkEl = document.getElementById("link-pill");
+  if (linkEl){
+    const csq = csqInfo(cellularCSQ);
+    const completeness = cloudUploadAttempts ? (cloudUploadSuccesses/cloudUploadAttempts*100) : 100;
+    const tone = csq.cls === "bad" ? "var(--red)" : csq.cls === "warn" ? "var(--amber)" : "var(--green)";
+    linkEl.innerHTML = `<i style="background:${tone}"></i><span>CSQ ${cellularCSQ.toFixed(0)}/31 · `
+      + `${completeness.toFixed(0)}% uploaded</span>`;
+  }
 
   const tiles = [
-    {label:"Field Nodes", value:`${online}/${nodes.length}`, cls: offlineNodes.length?"bad":"good"},
-    {label:"Nodes Offline", value:offlineNodes.length, cls: offlineNodes.length?"bad":"good"},
-    {label:"Active Alerts", value:alerted, cls: alerted?"bad":"good"},
-    {label:"Watching", value:watching, cls: watching?"warn":""},
-    {label:"Total Packets", value:totalPackets},
-    {label:"SMS Sent", value:totalSms},
-    {label:"SMS Suppressed", value:suppressedCount, cls: suppressedCount?"warn":""},
-    {label:"State Changes", value:stateChangeCount},
-    {label:"Avg Battery", value:avgBattery+"%", cls: lowBatteryCount?"warn":"good"},
-    {label:"Avg Soil (raw)", value:avgSoil},
-    {label:"Avg Water (raw)", value:avgWater},
-    {label:"Avg Health Index", value:avgHealth+"/100"},
-    {label:"Avg Flood Risk", value:avgRisk+"/100"},
-    {label:"SMS Cooldown", value: cooldownActive?`${cooldownMin}m left`:"Clear", cls: cooldownActive?"warn":"good"},
+    {label:"Nodes reporting", value:`${online}<small>/${nodes.length}</small>`,
+     cls: offlineNodes.length?"bad":""},
+    {label:"Active alerts", value:alerted, cls: alerted?"bad":"",
+     delta: watching ? `<span class="st-delta">${watching} watching</span>` : ""},
+    {label:"Soil health", value: none?"—":`${avgHealth}<small>/100</small>`,
+     delta: deltaBadge(fleetDelta(h=>h.health, DELTA_WINDOW), true)},
+    {label:"Flood risk", value: none?"—":`${avgRisk}<small>/100</small>`,
+     cls: avgRisk>=60?"bad":avgRisk>=35?"warn":"",
+     delta: deltaBadge(fleetDelta(h=>h.risk, DELTA_WINDOW), false)},
+    {label:"Soil moisture", value: none?"—":`${avgSoil}<small> ADC</small>`,
+     delta: deltaBadge(fleetDelta(h=>h.soil, DELTA_WINDOW), null)},
+    {label:"Battery", value: none?"—":`${avgBattery}<small>%</small>`,
+     cls: lowBatteryCount?"warn":"",
+     delta: deltaBadge(fleetDelta(h=>h.battery, DELTA_WINDOW), true)},
   ];
-
-  const csq = csqInfo(cellularCSQ);
-  const completeness = cloudUploadAttempts ? (cloudUploadSuccesses/cloudUploadAttempts*100) : 100;
-  tiles.push(
-    {label:"Cellular Signal (CSQ)", value:`${cellularCSQ.toFixed(0)}/31`, cls:csq.cls},
-    {label:"Cloud Data Completeness", value:completeness.toFixed(0)+"%", cls: completeness<80?"bad":completeness<95?"warn":"good"}
-  );
   document.getElementById("fleet-stats").innerHTML = tiles.map(t=>`
     <div class="stat-tile ${t.cls||''}">
-      <div class="st-label">${t.label}</div>
+      <div class="st-top"><span class="st-label">${t.label}</span>${t.delta||""}</div>
       <div class="st-value">${t.value}</div>
     </div>`).join("");
 }
@@ -1254,23 +1336,17 @@ function renderNodesTable(){
     const lastSeenStr = offline && n.failed
       ? `down ${secsAgo}s`
       : `${secsAgo}s ago`;
-    return `<tr style="${offline?'opacity:.7;':''}">
+    return `<tr style="${offline?'opacity:.6;':''}">
       <td class="n">${n.name}</td>
-      <td>Field sensor</td>
-      <td>${n.direct ? "Direct" : `Via Node ${n.relayVia}`}</td>
+      <td>${n.direct ? "Direct" : `Via node ${n.relayVia}`}</td>
       <td><span class="row-badge ${meta.cls}">${meta.label}</span>${n.rapidFlagged && !offline ? ' <span class="row-badge quiet" title="Soil moving fast. Rate threshold not yet calibrated, so this is an observation only.">fast</span>' : ''}</td>
       <td>${noData?"—":batteryCellHtml(n)}</td>
       <td class="n">${D(n.soil)}</td>
       <td class="n">${D(n.water)}</td>
       <td class="n">${D(last.health)}</td>
-      <td class="n">${noData?"—":last.pct.toFixed(1)}%</td>
       <td class="n">${noData?"—":last.risk.toFixed(0)}</td>
-      <td class="n">${noData?"—":(last.rate>=0?"+":"")+last.rate.toFixed(1)}</td>
-      <td class="n">${n.overCount}/${n.underCount||0}</td>
-      <td class="n">${n.packets}</td>
-      <td class="n">${n.smsCount}</td>
       <td>${noData?"never":lastSeenStr}</td>
-      <td><button class="action-btn ${n.failed?'restore':'fail'}" data-toggle-fail="${n.id}">${n.failed ? "Restore" : "Simulate failure"}</button></td>
+      <td style="text-align:right;"><button class="action-btn ${n.failed?'restore':'fail'}" data-toggle-fail="${n.id}">${n.failed ? "Restore" : "Fail"}</button></td>
     </tr>`;
   }).join("");
   document.querySelectorAll("[data-toggle-fail]").forEach(btn=>{
@@ -1314,27 +1390,37 @@ function renderEventsTable(){
 }
 
 /* ---- charts ---- */
-Chart.defaults.color = "#76838f";
+Chart.defaults.color = "#8c948e";
 Chart.defaults.font.family = "'Inter', sans-serif";
-Chart.defaults.font.size = 10.5;
-Chart.defaults.borderColor = "#e2e7ec";
-const nodeColors = {1:"#0f7a54", 2:"#b3392c", 3:"#1f5f96"};
-const rainColor = "#5b48a8";
+Chart.defaults.font.size = 11;
+Chart.defaults.borderColor = "#eeefea";
+// A series palette, not a severity one: these three say "node 1/2/3", and
+// nothing in a chart line should read as an alert colour by accident.
+const nodeColors = {1:"#52ab85", 2:"#d08a4d", 3:"#5b8fc9"};
+const rainColor = "#7d6fc4";
 
 document.getElementById("chart-legend").innerHTML = nodes.map(n=>
   `<div class="li"><i style="background:${nodeColors[n.id]}"></i>${n.name}</div>`
-).join("") + `<div class="li"><i style="background:${rainColor}"></i>Central Rain Gauge (planned)</div>`;
+).join("");
 
 function baseOpts(yOpts){
   return {
     responsive:true, animation:false, maintainAspectRatio:false,
     interaction:{mode:"nearest", intersect:false},
     plugins:{legend:{display:false}},
-    scales:{ x:{display:false}, y: Object.assign({grid:{color:"#e8ebef"}}, yOpts||{}) },
-    elements:{point:{radius:0}, line:{tension:.3, borderWidth:2}}
+    scales:{
+      x:{display:false},
+      y: Object.assign({
+        border:{display:false},
+        grid:{color:"#eeefea", drawTicks:false, borderDash:[4,4]},
+        ticks:{maxTicksLimit:5, padding:8}
+      }, yOpts||{})
+    },
+    elements:{point:{radius:0, hoverRadius:3}, line:{tension:.35, borderWidth:2}}
   };
 }
 function makeChart(id, extraYOpts){
+  if (!document.getElementById(id)) return stubChart();
   return new Chart(document.getElementById(id), {
     type:"line",
     data:{labels:[], datasets:nodes.map(n=>({label:n.name, data:[], borderColor:nodeColors[n.id], backgroundColor:"transparent"}))},
@@ -1346,11 +1432,13 @@ const chartWater = makeChart("chart-water", {min:0,max:260});
 const chartHealth = makeChart("chart-health", {min:0,max:100});
 const chartRisk = makeChart("chart-risk", {min:0,max:100});
 const chartRate = makeChart("chart-rate", {});
-const chartRain = new Chart(document.getElementById("chart-rain"), {
-  type:"line",
-  data:{labels:[], datasets:[{label:"Central Rain Gauge", data:[], borderColor:rainColor, backgroundColor:"transparent"}]},
-  options: baseOpts({min:850,max:1023})
-});
+const chartRain = document.getElementById("chart-rain")
+  ? new Chart(document.getElementById("chart-rain"), {
+      type:"line",
+      data:{labels:[], datasets:[{label:"Central Rain Gauge", data:[], borderColor:rainColor, backgroundColor:"transparent"}]},
+      options: baseOpts({min:850,max:1023})
+    })
+  : stubChart();
 const chartBattery = makeChart("chart-battery", {min:0,max:100});
 
 function updateCharts(){
@@ -1945,7 +2033,6 @@ function buildNodeDetailCards(){
           <div class="h-lab" id="nd-zone-${n.id}">—</div>
         </div>
       </div>
-      <div class="nd-bar"><div class="f" id="nd-bar-${n.id}" style="width:0%"></div></div>
       <div class="nd-charts">
         <div class="nd-chart">
           <h5>Soil</h5>          <div class="nd-chart-box"><canvas id="nd-soil-${n.id}"></canvas></div>
@@ -2147,6 +2234,16 @@ async function pollFeed(){
   setLiveBanner();
 }
 
+// The header pill is the one place that always says which source the page is
+// showing, so it must never be left reading "Simulated" over live data.
+function setModePill(live){
+  const pill = document.getElementById("mode-pill");
+  const label = document.getElementById("mode-label");
+  if (!pill || !label) return;
+  pill.classList.toggle("live", !!live);
+  label.textContent = live ? "Live feed" : "Simulated";
+}
+
 function setLive(on){
   liveMode = on;
   const btn = document.getElementById("live-btn");
@@ -2163,10 +2260,12 @@ function setLive(on){
     // to show rather than a simulated trace.
     rainNode.history = []; rainNode.packets = 0; rainNode.lastSeen = 0;
     liveLastId = 0; liveSeen = 0; liveError = null;
-    if (btn) btn.textContent = "Stop live feed";
+    if (btn){ btn.textContent = "Stop live feed"; btn.classList.add("active"); }
+    setModePill(true);
     pollFeed();
   } else {
-    if (btn) btn.textContent = "Live feed";
+    if (btn){ btn.textContent = "Live feed"; btn.classList.remove("active"); }
+    setModePill(false);
     setLiveBanner();
     warmupHistory();                   // give the simulator history again
     setSpeed(15);
@@ -2475,18 +2574,15 @@ function renderEconomics(){
   const NODE_COST = 120, COMMERCIAL_COST = 1000;
   const n = nodes.length;
   const fleetCost = n*NODE_COST, commercialCost = n*COMMERCIAL_COST;
-  const savings = commercialCost - fleetCost;
   const tiles = [
-    {label:"Nodes Deployed", value:n},
-    {label:"Target Cost / Node", value:"$"+NODE_COST},
-    {label:"This Fleet's Cost", value:"$"+fleetCost},
-    {label:"Commercial Equivalent", value:"$"+commercialCost.toLocaleString()},
-    {label:"Estimated Savings", value:"$"+savings.toLocaleString(), cls:"good"},
-    {label:"Per-Sensor Subscription", value:"$0/mo"},
+    {label:"Cost per node", value:"$"+NODE_COST},
+    {label:"This fleet", value:"$"+fleetCost},
+    {label:"Commercial equivalent", value:"$"+commercialCost.toLocaleString()},
+    {label:"Subscription", value:"$0<small>/mo</small>"},
   ];
   document.getElementById("economics-stats").innerHTML = tiles.map(t=>`
     <div class="stat-tile ${t.cls||""}">
-      <div class="st-label">${t.label}</div>
+      <div class="st-top"><span class="st-label">${t.label}</span></div>
       <div class="st-value">${t.value}</div>
     </div>`).join("");
 }
@@ -2513,6 +2609,33 @@ document.getElementById("export-csv").addEventListener("click", ()=>{
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
 });
+
+/* =========================================================================
+   SIDEBAR
+
+   The nav marks the section currently under the top of the viewport. A
+   scroll listener rather than IntersectionObserver, because sections here
+   vary from one tile row to a full screen and "which one am I reading"
+   is simply the last one whose top has passed.
+   ========================================================================= */
+(function initNav(){
+  const links = Array.from(document.querySelectorAll("#sb-nav a"));
+  const sections = links
+    .map(a=>({a, el:document.getElementById(a.getAttribute("href").slice(1))}))
+    .filter(x=>x.el);
+  if (!sections.length) return;
+  let frame = null;
+  function mark(){
+    frame = null;
+    const y = window.scrollY + 120;
+    let current = sections[0];
+    sections.forEach(sc=>{ if (sc.el.offsetTop <= y) current = sc; });
+    links.forEach(a=>a.classList.toggle("on", a === current.a));
+  }
+  window.addEventListener("scroll", ()=>{ if (!frame) frame = requestAnimationFrame(mark); }, {passive:true});
+  window.addEventListener("resize", mark);
+  mark();
+})();
 
 setInterval(()=>{ document.getElementById("clock").textContent = new Date().toLocaleTimeString([], {hour12:false}); }, 1000);
 
