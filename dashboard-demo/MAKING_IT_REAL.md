@@ -71,21 +71,31 @@ boolean.
 
 Bring `Base_code` up to what the console already models.
 
-| # | Task | Effort | Notes |
-|---|---|---|---|
-| 2.1 | Replace placeholder thresholds with the brief's values | 1h | soil 436, water 30, rain 980, clear at 470 |
-| 2.2 | Implement L0–L3 instead of one threshold | 1 day | Port `assessLevel()` — it is already written and tested in JS |
-| 2.3 | Sustain counting, 3 readings | 2h | Firmware currently fires on the first crossing |
-| 2.4 | **Per-node SMS cooldown** | 3h | One `lastSmsTime` today, so a second flooding node is silently suppressed |
-| 2.5 | Rolling mean over 10 readings before rate | 3h | The brief's ~5% wobble makes single-reading rates meaningless |
-| 2.6 | Check the HTTP response from upload | 2h | Firmware never reads it — uploads can fail silently |
-| 2.7 | Log `AT+CSQ` signal strength | 2h | Command is supported, never called |
-| 2.8 | Battery voltage divider + ADC read | 1 day + parts | No battery sensing exists; the console's battery is invented |
-| 2.9 | Soil fault detection (≥960 = probe out) | 1h | Currently reads as "very dry" |
+Most of this table is now **done** — it was written against an older
+`Base_code` and was still listing shipped work as outstanding. Re-checked
+against `Base_Code.ino` on 2026-11-05, line numbers in brackets.
 
-**2.4 is the one to do first.** It is a correctness bug, not a feature: during
-a real regional flood — the exact scenario this exists for — the second and
-third nodes to flood are suppressed for an hour.
+| # | Task | State | Evidence |
+|---|---|---|---|
+| 2.1 | Brief's thresholds | **done** | `ALERT_RULES_BRIEF 1`; soil 436 / water 30 / clear 470 [120–128] |
+| 2.2 | Levels instead of one threshold | **done** | `RISK_LEVELS 1` → NORMAL/WATCH/WARNING/FLOOD, uploaded as field8 |
+| 2.3 | Sustain counting, 3 readings | **done** | `alertCount >= ALERT_CONFIRM_READINGS` [548] |
+| 2.4 | **Per-node SMS cooldown** | **open** | Still one global `lastSmsTime` [145, 1036] |
+| 2.5 | Rolling mean before rate | **open** | Dashboard-side only |
+| 2.6 | Check the HTTP response | **done** | Parses `+HTTPACTION:` and reports the code [1154–1172] |
+| 2.7 | Log `AT+CSQ` | **done** | Called in the modem health check [803], with `+CREG` and `+CPIN` |
+| 2.8 | Battery sensing | **done** | Real readings arriving: 3660 mV, −78 mA, 8% |
+| 2.9 | Soil fault (≥960 = probe out) | **done** | `RISK_SOIL_FAULT_FROM` [387, 951] |
+
+**2.4 is the one still worth doing first.** It is a correctness bug, not a
+feature: during a real regional flood — the exact scenario this exists for —
+the second and third nodes to flood are silently suppressed for an hour.
+
+**2.10, new and not previously listed: a failed upload drops the reading.**
+`sendToThingSpeak()` reports the failure and moves on; there is no retry and
+no queue. One lost reading does not matter much, but a weak-signal window
+leaves a hole in the series that the dashboard's rate calculation then
+interpolates straight across.
 
 ---
 
@@ -93,14 +103,26 @@ third nodes to flood are suppressed for an hour.
 
 ThingSpeak accepts the data but can't drive the console.
 
-| # | Task | Effort | Notes |
+| # | Task | State | Notes |
 |---|---|---|---|
-| 3.1 | Ingest endpoint, same query-string format | 1 day | `Base_code` already has a configurable `SERVER_HOST` — no firmware change |
-| 3.2 | Time-series storage | 1 day | Postgres/Timescale or SQLite to start; a node is ~8.6k readings/day at 10s |
-| 3.3 | Point the console at the API | 1 day | Swap the simulator for `fetch`; the render layer is unchanged |
-| 3.4 | Run the prediction server-side | 2 days | Move `floodForecast()` out of the browser so alerts fire with nobody watching |
-| 3.5 | Offline detection from upload gaps | 2h | Already dashboard-side inference; same logic server-side |
-| 3.6 | Hosting | Half day | Fly/Railway/VPS, ~$5–10/mo |
+| 3.1 | Ingest endpoint, same query-string format | **done** | `server/fms_server.py`, stdlib only |
+| 3.2 | Time-series storage | **done** | SQLite; a node is ~4.3k readings/day at the 20s minimum |
+| 3.3 | Point the console at the API | **done** | `Live feed` button; same origin by default |
+| 3.4 | Run the prediction server-side | open | Move `floodForecast()` out of the browser so alerts fire with nobody watching |
+| 3.5 | Offline detection from upload gaps | **done** | `lastSeen` is the reading's own timestamp; 10 min matches the firmware |
+| 3.6 | **Hosting** | **open — now the blocker** | See below |
+
+**3.6 is what stands between this and a live site.** `SERVER_HOST` is compiled
+into the firmware, and the current value is a Cloudflare *quick* tunnel
+hostname — those are randomly regenerated on every launch and thrown away when
+the process stops. The one in the sketch has been dead for two weeks. Every
+restart currently means an edit, a recompile and a reflash.
+
+Checked 2026-11-05: there is no longer a free tier that is both always-on and
+plain-HTTP. Render's free web service sleeps after 15 minutes and takes about
+a minute to wake, which is far past the modem's 10s `AT+HTTPACTION` timeout —
+every reading after an idle period would fail. The realistic options are a
+small paid VM (~$4–5/mo) or Oracle Cloud's Always Free VM.
 
 **3.4 matters more than it looks.** Today the prediction only exists while a
 browser tab is open. For it to be a product it has to run without one.

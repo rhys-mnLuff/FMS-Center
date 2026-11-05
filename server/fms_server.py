@@ -14,6 +14,17 @@ and serves it back as JSON for the dashboard:
   GET /feed?node=1     one node
   GET /health          liveness
 
+It also serves the dashboard itself:
+
+  GET /                dev.html
+  GET /dev.html        the console
+  GET /forecast.html   the per-field forecast
+
+One origin for both means one tunnel (or one host) exposes the whole thing,
+and the page's default feed URL -- same origin, /feed -- just works. Running
+the page and the API on different ports only works on the machine they are
+both running on, which is the one place a field dashboard is least useful.
+
 Plain HTTP on purpose. The base station is an ATmega328P talking through a
 SIM7600 with AT+HTTPPARA="URL","http://..." -- there is no TLS stack on that
 chip, so an HTTPS-only host cannot be used without changing the firmware.
@@ -23,7 +34,7 @@ Standard library only: no pip install, runs on any free tier VM.
   python3 fms_server.py [--port 8080] [--db fms.db]
 """
 
-import argparse, json, sqlite3, sys, time
+import argparse, json, os, sqlite3, sys, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -33,6 +44,18 @@ NODE_KEYS = {
     "O3JGLAD7IX4P67IE": 1,
     "REPLACE_WITH_NODE_2_KEY": 2,
     "REPLACE_WITH_NODE_3_KEY": 3,
+}
+
+# Exactly which files may be served, by request path. An allowlist rather
+# than a document root: this process is reachable from the public internet
+# through the tunnel, and a static handler that joins user input onto a
+# directory is how a repo full of API keys ends up readable.
+STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          os.pardir, "dashboard-demo")
+STATIC = {
+    "/":              ("dev.html",      "text/html; charset=utf-8"),
+    "/dev.html":      ("dev.html",      "text/html; charset=utf-8"),
+    "/forecast.html": ("forecast.html", "text/html; charset=utf-8"),
 }
 
 SCHEMA = """
@@ -131,6 +154,15 @@ class Handler(BaseHTTPRequestHandler):
             cols = [c[0] for c in cur.description]
             return self._json(200, [dict(zip(cols, r)) for r in cur.fetchall()])
 
+        if u.path in STATIC:
+            name, ctype = STATIC[u.path]
+            try:
+                with open(os.path.join(STATIC_DIR, name), "rb") as f:
+                    body = f.read()
+            except OSError:
+                return self._send(404, b"not found")
+            return self._send(200, body, ctype)
+
         if u.path == "/health":
             n = db.execute("SELECT COUNT(*) FROM readings").fetchone()[0]
             last = db.execute("SELECT MAX(ts) FROM readings").fetchone()[0]
@@ -156,8 +188,9 @@ def main():
     db.executescript(SCHEMA)
 
     print(f"FMS server on http://0.0.0.0:{a.port}  (db: {a.db})")
-    print(f"  ingest: /update?api_key=...&field1=...")
-    print(f"  feed:   /feed   health: /health")
+    print(f"  ingest:    /update?api_key=...&field1=...")
+    print(f"  feed:      /feed        health: /health")
+    print(f"  dashboard: /dev.html    forecast: /forecast.html")
     ThreadingHTTPServer(("0.0.0.0", a.port), Handler).serve_forever()
 
 

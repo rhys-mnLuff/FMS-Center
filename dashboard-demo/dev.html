@@ -856,7 +856,8 @@ function updateBattery(node, silent){
   }
 }
 function isOffline(node){
-  return node.failed || (Date.now()-node.lastSeen) > OFFLINE_THRESHOLD_MS;
+  const limit = liveMode ? LIVE_OFFLINE_MS : OFFLINE_THRESHOLD_MS;
+  return node.failed || (Date.now()-node.lastSeen) > limit;
 }
 function toggleNodeFailure(id){
   const node = nodes.find(n=>n.id===id);
@@ -1314,6 +1315,13 @@ function renderFleetStats(){
     </div>`).join("");
 }
 
+function fmtAgo(secs){
+  if (secs < 90) return `${secs}s`;
+  if (secs < 5400) return `${Math.round(secs/60)}m`;
+  if (secs < 172800) return `${Math.round(secs/3600)}h`;
+  return `${Math.round(secs/86400)}d`;
+}
+
 function batteryCellHtml(node){
   const pct = node.battery;
   const cls = pct <= BATTERY_BROWNOUT_PCT*3 ? "bad" : pct <= BATTERY_LOW_PCT ? "warn" : "";
@@ -1334,8 +1342,8 @@ function renderNodesTable(){
     const meta = offline ? {cls:"offline", label: n.failReason==="brownout" ? "Offline (battery)" : n.failed ? "Offline (fault)" : "Offline"} : statusMeta(n.state);
     const secsAgo = Math.round((Date.now()-n.lastSeen)/1000);
     const lastSeenStr = offline && n.failed
-      ? `down ${secsAgo}s`
-      : `${secsAgo}s ago`;
+      ? `down ${fmtAgo(secsAgo)}`
+      : `${fmtAgo(secsAgo)} ago`;
     return `<tr style="${offline?'opacity:.6;':''}">
       <td class="n">${n.name}</td>
       <td>${n.direct ? "Direct" : `Via node ${n.relayVia}`}</td>
@@ -2165,8 +2173,28 @@ async function fetchWeather(){
    Live mode stops the simulator entirely rather than blending the two: a
    chart mixing invented and measured readings would be worse than either.
    ========================================================================= */
-const FEED_URL = "http://localhost:8080/feed";
+/* Where the readings come from. Three cases, in order:
+     ?feed=<url>        explicit override, for pointing a local page at a
+                        deployed server (or the reverse) without an edit
+     served from a host  assume the ingest server sits behind the same origin
+                        at /feed -- that is how it is deployed
+     served locally      fms_server.py on :8080 beside the page, the dev setup
+   Hardcoding localhost made the page work only on the machine running the
+   server, which is the one place a field dashboard is least useful. */
+const FEED_URL = (() => {
+  const q = new URLSearchParams(location.search).get("feed");
+  if (q) return q.replace(/\/+$/, "");
+  const local = /^(localhost|127\.0\.0\.1|\[::1\]|)$/.test(location.hostname);
+  if (location.protocol.startsWith("http") && !local) return location.origin + "/feed";
+  return "http://localhost:8080/feed";
+})();
 const FEED_POLL_MS = 4000;
+/* The simulator reads every 10s, so 30s of silence means something is wrong.
+   A cellular node cannot be held to that: TS_MIN_INTERVAL_MS alone spaces
+   uploads 20s apart, and a retry or a weak-signal window stretches it
+   further. 10 minutes matches NODE_OFFLINE_MS in Base_Code.ino, so the
+   dashboard and the base station agree on what "offline" means. */
+const LIVE_OFFLINE_MS = 600000;
 let liveMode = false, liveLastId = 0, liveSeen = 0, liveError = null;
 
 function setLiveBanner(){
@@ -2178,8 +2206,15 @@ function setLiveBanner(){
     el.style.background = "var(--green-bg)"; el.style.borderColor = "var(--green)";
     document.querySelector(".controls-bar").insertAdjacentElement("afterend", el);
   }
+  // "26 readings received" is true of a feed that went quiet days ago, so
+  // the age of the newest reading goes next to it. That is the number that
+  // answers "is this actually live?".
+  let newest = 0;
+  nodes.forEach(n=>{ if (n.lastSeen > newest) newest = n.lastSeen; });
+  const age = newest ? fmtAgo(Math.round((Date.now()-newest)/1000)) : null;
   const state = liveError ? `<b style="color:var(--red)">${liveError}</b>`
-                          : `${liveSeen} reading${liveSeen===1?"":"s"} received`;
+    : `${liveSeen} reading${liveSeen===1?"":"s"} received`
+      + (age ? ` &middot; newest ${age} ago` : ` &middot; none yet`);
   el.innerHTML = `<span class="db-step" style="color:var(--green)">LIVE</span>
     <span class="db-text">Real readings from the base station — simulator stopped. ${state}</span>
     <button class="db-stop" id="live-stop" style="border-color:var(--green); color:var(--green)">Back to simulator</button>`;
@@ -2200,13 +2235,22 @@ function ingestRows(rows){
     const health = calculateSoilHealth(soil);
     const pct = provisionalWetnessPct(soil);
     const prev = node.history[node.history.length-1];
-    const rate = prev ? (pct - prev.pct) / (READ_INTERVAL_MS/60000) : 0;
+    // Rate over the gap these two readings actually have, not over the
+    // simulator's fixed 10s. Cellular uploads are irregular -- 20s minimum,
+    // longer after a retry -- so assuming a constant interval inflates or
+    // deflates every rate, and the rate is what the prediction is built on.
+    const dtMin = prev ? (r.ts - prev.t) / 60000 : 0;
+    const rate = (prev && dtMin > 0) ? (pct - prev.pct) / dtMin : 0;
     node.soil = soil; node.water = water;
     if (r.batt_pct !== null) node.battery = r.batt_pct;
     node.history.push({t: r.ts, soil, water, health, pct,
                        risk: riskScore(pct, water), rate, battery: node.battery});
     if (node.history.length > 60) node.history.shift();
-    node.packets++; node.lastSeen = Date.now(); node.failed = false;
+    node.packets++; node.failed = false;
+    // When the server received it, never when we read it off the feed.
+    // Stamping Date.now() here made a three-day-old reading display as
+    // "0s ago" and kept a dead node permanently online.
+    node.lastSeen = r.ts;
     evaluateAlertState(node, false);
     predictDirty = true;
     added++;
