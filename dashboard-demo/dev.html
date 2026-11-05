@@ -370,7 +370,7 @@
       <div class="brand-mark"><svg viewBox="0 0 24 24"><path d="M4 17h16M4 12h16M4 7h16"/></svg></div>
       <div>
         <h1>FMS Dev Console</h1>
-        <p>Full telemetry · fleet stats · not for field use</p>
+        
       </div>
     </div>
     <div class="header-right">
@@ -384,7 +384,7 @@
   </header>
 
   <div class="controls-bar">
-    <span class="label">Sim speed</span>
+    
     <button data-speed="0">Pause</button>
     <button data-speed="1">1×</button>
     <button data-speed="4">4×</button>
@@ -430,13 +430,13 @@
   </div>
 
   <div class="section-title">
-    <h2>Advisory</h2><span>templated, pending model</span>
+    <h2>Advisory</h2>
   </div>
   <div class="advisory" id="advisory">
     <div class="adv-col">
       
       <div class="adv-sms" id="adv-sms">—</div>
-      <div class="adv-now">firmware today: <code id="adv-raw">—</code></div>
+      
     </div>
     <div class="adv-col">
       
@@ -459,7 +459,7 @@
     </table>
   </div>
 
-  <div class="section-title"><h2>Rain gauge</h2><span>planned hardware</span></div>
+  <div class="section-title"><h2>Rain gauge</h2></div>
   <div class="rain-card">
     <div class="rain-head">
       <div class="rh-icon"><svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round"><path d="M17 15a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.6 1.7A4 4 0 0 0 7 17h10Z"/><path d="M9 19v1M12 19v2M15 19v1"/></svg></div>
@@ -1794,11 +1794,11 @@ function renderPrediction(){
     <div class="predict-metrics">
       <div class="pm"><div class="k">Soil</div><div class="v">${p.last.soil}</div><div class="s">${p.soilPerMin>=0?"+":""}${p.soilPerMin.toFixed(1)}/min</div></div>
       <div class="pm"><div class="k">Water</div><div class="v">${p.last.water}</div><div class="s">${p.waterPerMin>=0?"+":""}${p.waterPerMin.toFixed(1)}/min</div></div>
-      <div class="pm"><div class="k">Rain</div><div class="v">${rainNode.raw}</div><div class="s">${f.rainingNow?"raining":"dry"}</div></div>
-      <div class="pm"><div class="k">Saturation</div><div class="v">${fmtEta(f.satAt)}</div><div class="s">to ${SOIL_FLOOD_THRESHOLD}</div></div>
-      <div class="pm"><div class="k">Flood</div><div class="v">${fmtEta(f.floodEta)}</div><div class="s">water &gt;${WATER_FLOOD_THRESHOLD}</div></div>
+      <div class="pm"><div class="k">Rain</div><div class="v">${rainNode.raw}</div></div>
+      <div class="pm"><div class="k">Saturation</div><div class="v">${fmtEta(f.satAt)}</div></div>
+      <div class="pm"><div class="k">Flood</div><div class="v">${fmtEta(f.floodEta)}</div></div>
       <div class="pm"><div class="k">Zone</div><div class="v" style="font-size:10.5px;">${zone.short}${zone.est?' <span class="est">est.</span>':''}</div></div>
-      <div class="pm"><div class="k">Rain fcst${demoWeather?' <span class="est">demo</span>':''}</div><div class="v">${f.fc.h6===null?"—":f.fc.h6+"mm"}</div><div class="s">${demoWeather?"simulated":"6h"}${f.fc.h12===null?"":` · ${f.fc.h12}mm 12h`}</div></div>
+      <div class="pm"><div class="k">Rain 6h${demoWeather?' <span class="est">demo</span>':''}</div><div class="v">${f.fc.h6===null?"—":f.fc.h6+"mm"}</div></div>
     </div>
     <div class="cascade">${f.stages.map(st=>{
       const reached = st.eta === 0;
@@ -1828,12 +1828,11 @@ function renderPrediction(){
 function renderAdvisory(node, p, f, a){
   const sms = document.getElementById("adv-sms");
   const tech = document.getElementById("adv-tech");
-  const raw = document.getElementById("adv-raw");
   if (!sms) return;
 
   if (!node || !p || !p.ok){
     sms.textContent = "—"; sms.className = "adv-sms";
-    tech.textContent = "Select a node."; raw.textContent = "—";
+    tech.textContent = "Select a node.";
     return;
   }
 
@@ -1842,9 +1841,6 @@ function renderAdvisory(node, p, f, a){
   const lead = f.floodEta !== null ? f.floodEta : f.satAt;
 
   // What the shipped firmware would send for this same reading.
-  raw.textContent = a.level >= 3
-    ? `FLOOD ALERT - Node ${node.id}! Soil: ${p.last.soil} Water: ${p.last.water}`
-    : `(no SMS — below threshold)`;
 
   let cls = "", body;
   if (a.level >= 3){
@@ -1952,17 +1948,11 @@ function buildNodeDetailCards(){
       <div class="nd-bar"><div class="f" id="nd-bar-${n.id}" style="width:0%"></div></div>
       <div class="nd-charts">
         <div class="nd-chart">
-          <h5>Soil moisture</h5>          <div class="nd-chart-box"><canvas id="nd-soil-${n.id}"></canvas></div>
+          <h5>Soil</h5>          <div class="nd-chart-box"><canvas id="nd-soil-${n.id}"></canvas></div>
         </div>
         <div class="nd-chart">
-          <h5>Water level</h5>          <div class="nd-chart-box"><canvas id="nd-water-${n.id}"></canvas></div>
+          <h5>Water</h5>          <div class="nd-chart-box"><canvas id="nd-water-${n.id}"></canvas></div>
         </div>
-      </div>
-      <div class="nd-foot">
-        <span>Wetness <b id="nd-pct-${n.id}">—</b></span>
-        <span>Risk <b id="nd-risk-${n.id}">—</b></span>
-        <span>Rate <b id="nd-rate-${n.id}">—</b></span>
-        <span>Battery <b id="nd-batt-${n.id}">—</b></span>
       </div>
     </div>`).join("");
 
@@ -2012,16 +2002,8 @@ function updateNodeDetail(){
     document.getElementById(`nd-zone-${n.id}`).innerHTML =
       offline ? "offline" : `${zone.label}${zone.est ? ' <span class="est">est.</span>' : ''}`;
 
-    const bar = document.getElementById(`nd-bar-${n.id}`);
-    bar.className = `f ${band}`;
-    bar.style.width = (offline ? 0 : last.health) + "%";
-
     document.getElementById(`nd-sub-${n.id}`).textContent =
       offline ? `offline · ${n.failReason || "no packets"}` : `soil ${last.soil} · water ${last.water}`;
-    document.getElementById(`nd-pct-${n.id}`).textContent = last.pct.toFixed(0)+"%";
-    document.getElementById(`nd-risk-${n.id}`).textContent = last.risk.toFixed(0);
-    document.getElementById(`nd-rate-${n.id}`).textContent = last.rate.toFixed(1)+"%/min";
-    document.getElementById(`nd-batt-${n.id}`).textContent = last.battery.toFixed(0)+"%";
 
     const c = nodeCharts[n.id];
     if (!c) return;
