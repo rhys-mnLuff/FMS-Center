@@ -1334,7 +1334,71 @@ void checkOfflineNodes() {
 // =====================================================================
 
 void printHelp() {
-  Serial.println(F("COMMANDS  n node table | m modem status | v show/hide duplicates | h help"));
+  Serial.println(F("COMMANDS  n node table | m modem status | t test cellular | v duplicates | h help"));
+}
+
+// Proves the cellular data path on demand, without a sensor node and without
+// writing anything anywhere.
+//
+// Uploads are packet-driven -- sendToThingSpeak() only runs when a node's
+// reading arrives over the HC-12 -- so with the base station alone there was
+// no way to tell "the modem cannot transmit" apart from "no node is sending".
+// Two unrelated faults, one symptom: silence.
+//
+// This fetches /health instead of /update. Our server answers 200 to it and
+// stores nothing, so the test can be repeated without polluting the series
+// with readings no probe ever took.
+void testCellular() {
+  if (!modemAlive) {
+    Serial.println(F("test: modem is not responding - check its power first"));
+    return;
+  }
+  Serial.print(F("test: GET http://"));
+  Serial.print(SERVER_HOST);
+  Serial.println(F("/health"));
+
+  pollRadio();
+  sim7600.listen();
+  sim7600.print(F("AT+CGDCONT=1,\"IP\",\""));
+  sim7600.print(CELLULAR_APN);
+  sim7600.println(F("\""));
+  radioWait(1000);
+  sim7600.println(F("AT+HTTPINIT"));
+  radioWait(500);
+  sim7600.print(F("AT+HTTPPARA=\"URL\",\"http://"));
+  sim7600.print(SERVER_HOST);
+  sim7600.println(F("/health\""));
+  radioWait(1000);
+
+  int8_t r = modemCommand(F("AT+HTTPACTION=0"), PSTR("+HTTPACTION:"), 10000);
+  int code = -1;
+  if (r == MODEM_FOUND) {
+    char *c = strchr(modemLine, ',');
+    if (c) code = atoi(c + 1);
+  }
+  Serial.print(F("test: "));
+  if (code == 200) {
+    Serial.println(F("OK - reached the server over cellular"));
+  } else if (code == 404) {
+    // Only a web server that received the request can answer 404, so the
+    // radio path is proven even though this host has no /health.
+    Serial.println(F("OK - cellular works (404: host has no /health)"));
+  } else if (code >= 600) {
+    Serial.print(F("FAILED (HTTP "));
+    Serial.print(code);
+    Serial.println(F(") - request never left the modem. Check APN and data plan."));
+  } else if (code > 0) {
+    Serial.print(F("reached a server, HTTP "));
+    Serial.println(code);
+  } else {
+    Serial.print(F("FAILED ("));
+    Serial.print(modemLine);
+    Serial.println(')');
+  }
+  sim7600.println(F("AT+HTTPTERM"));
+  radioWait(500);
+  if (r == MODEM_TIMEOUT) checkModemAfterFailure();
+  hc12.listen();
 }
 
 void printNodeTable() {
@@ -1373,6 +1437,7 @@ void handleSerialCommands() {
     if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
     if (c == 'n') printNodeTable();
     else if (c == 'm') printModemStatus();
+    else if (c == 't') testCellular();
     else if (c == 'v') { verbose = !verbose; Serial.println(verbose ? F("VERBOSE on") : F("VERBOSE off")); }
     else if (c == 'h' || c == '?') printHelp();
   }

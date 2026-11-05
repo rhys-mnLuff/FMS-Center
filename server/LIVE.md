@@ -61,6 +61,46 @@ and a reflash.
 
 Two ways out.
 
+### Step 0 — does the modem transmit at all?
+
+Answer this before touching hosting. It needs no tunnel, no server and no
+domain.
+
+```bash
+./server/check_cellular.sh
+```
+
+It flashes the firmware pointed at a plain-HTTP host that is always up,
+drives the new `t` command over serial, and classifies the result: cellular
+works / no data connection / resetting / modem not responding / SIM / network.
+The sketch's own `SERVER_HOST` is restored afterwards.
+
+**Why a separate test.** Uploads are packet-driven — `sendToThingSpeak()` only
+runs when a sensor node's reading arrives over the HC-12. So with the base
+station alone, "the modem cannot transmit" and "no node is sending" produce
+the same symptom: silence. The `t` command fetches `/health` over cellular
+instead, which needs no sensor node and writes nothing, so it can be repeated
+without putting readings in the series that no probe ever took.
+
+Type `t` into the serial monitor any time:
+
+```
+test: GET http://<SERVER_HOST>/health
+test: OK - reached the server over cellular
+```
+
+**Reading the result.** The test host has no `/health`, so it answers 404 —
+and that is the proof we want. Only a real web server that received the
+request can produce a 404. A DNS failure, a dead data connection or a
+brownout cannot fake one.
+
+| Result | Means |
+|---|---|
+| `test: OK` | Power, SIM, registration, APN and DNS all fine |
+| `FAILED (HTTP 6xx)` | Modem-level error — request never left. APN or data plan |
+| Board reboots mid-test | Supply collapse. Section 1 |
+| `SIM module: NOT RESPONDING` | Modem unpowered or miswired |
+
 ### Short term — `server/go_live.sh`
 
 Does the whole loop in one command: starts the ingest server, opens a tunnel,
@@ -152,8 +192,9 @@ anything.
 ## 5. Order
 
 1. Own supply + 1000µF cap on the modem — **nothing else can be tested first**
-2. `./server/go_live.sh` — prove one reading arrives over cellular
-3. Probe in actual soil, battery charged — prove the readings mean something
-4. Pick a host, point `SERVER_HOST` at it once, stop reflashing
-5. Rotate the node 1 key; issue real keys for nodes 2 and 3
-6. Upload retry in firmware (2.10) and per-node SMS cooldown (2.4)
+2. `./server/check_cellular.sh` — prove the modem transmits, no tunnel needed
+3. `./server/go_live.sh` — prove a reading reaches our endpoint
+4. Probe in actual soil, battery charged — prove the readings mean something
+5. Pick a host, point `SERVER_HOST` at it once, stop reflashing
+6. Rotate the node 1 key; issue real keys for nodes 2 and 3
+7. Upload retry in firmware (2.10) and per-node SMS cooldown (2.4)
