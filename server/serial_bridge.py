@@ -7,10 +7,16 @@ reading to the same /update endpoint the cellular path uses. Nothing
 downstream can tell the difference, so the dashboard wiring done against
 this keeps working unchanged once THINGSPEAK_ENABLED is turned on.
 
-Lines it understands (printPacketLine / printPowerLine in Base_Code.ino):
+Lines it understands:
 
   NODE 1 | hops 0 | soil 1019 | water 0 | rain NONE | batt 18% discharging LOW | risk NORMAL
-  NODE 1 power | 3.72V | 10-min avg -76mA | est. 5.2h left
+  [20:11] NODE 1 | hops 0 | soil 1009 | water 0 | rain NONE | batt 26% discharging | risk NORMAL
+  NODE 1 power | 3.75V | 10-min avg -26mA | est. 22.0h left
+
+The second form is from the Nov 2026 base firmware, which prefixes every
+line with the time it gets from the network. The pattern used to anchor on
+"^NODE", so against that firmware this bridge ran happily and forwarded
+nothing at all.
 
 The power line arrives separately from the reading, so battery values are
 cached per node and attached to the next reading.
@@ -27,7 +33,9 @@ import argparse, re, sys, time, urllib.parse, urllib.request
 # appends "  << FLOOD LEVEL" after the risk word. A rigid field-order regex
 # silently dropped exactly those two cases -- including every flood reading,
 # which is the one that matters most. Parse by splitting on "|" instead.
-RE_NODE = re.compile(r"^NODE\s+(\d+)\s*\|")
+# The leading "[HH:MM] " is optional: older firmware has no clock, the Nov 2026
+# build prints one on every line.
+RE_NODE = re.compile(r"^(?:\[\d{1,2}:\d{2}\]\s*)?NODE\s+(\d+)\s*\|")
 RE_POWER = re.compile(
     r"NODE\s+(\d+)\s+power\s*\|\s*([\d.]+)V\s*\|\s*10-min avg\s+(-?\d+)mA"
 )
@@ -39,6 +47,12 @@ def parse_reading(line):
     if not m:
         return None
     out = {"node": int(m.group(1))}
+    # The 'n' command prints a node TABLE that also carries soil and water:
+    #   NODE 1 | last 13 s ago | hops 0 | soil 1009 | ... | lost 0
+    # It is a summary of readings already forwarded, not a new one. Without
+    # this, every press of 'n' injects a duplicate reading.
+    if re.search(r"\|\s*(last|lost)\s", line):
+        return None
     for seg in line.split("|")[1:]:
         seg = seg.strip()
         # "<<" marks an alert banner appended to the last field, not a field

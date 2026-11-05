@@ -1241,13 +1241,21 @@ function statusMeta(state){
    `back` steps earlier), as a percentage. Nodes without that much history
    are skipped, and with none the tile simply shows no badge. */
 const DELTA_WINDOW = 12;
+/* A trend is only a trend if the two readings are close enough in time to be
+   comparable. Live history can span a gap of days -- a bench session in
+   October sitting next to one in November -- and twelve readings back then
+   lands on the far side of it. That produced "Battery +163%" from 8% two
+   weeks ago against 21% now: arithmetically right, meaningless as a trend. */
+const DELTA_MAX_SPAN_MS = 2 * 3600 * 1000;
 function fleetDelta(pick, back){
   const src = (liveMode ? nodes.filter(n=>n.history.length) : nodes);
   const ds = [];
   src.forEach(n=>{
     const h = n.history;
     if (h.length < back+1) return;
-    const now = pick(h[h.length-1]), then = pick(h[h.length-1-back]);
+    const a = h[h.length-1], b = h[h.length-1-back];
+    if (a.t - b.t > DELTA_MAX_SPAN_MS) return;
+    const now = pick(a), then = pick(b);
     if (!isFinite(now) || !isFinite(then) || then === 0) return;
     ds.push((now-then)/Math.abs(then)*100);
   });
@@ -1274,8 +1282,16 @@ function renderFleetStats(){
   const avg = (fn)=> reporting.length
     ? reporting.reduce((s,n)=>s+fn(n),0)/reporting.length : 0;
   const last = n => n.history[n.history.length-1];
-  const avgSoil = avg(n=>n.soil).toFixed(0);
-  const avgHealth = avg(n=>{const l=last(n); return l?l.health:calculateSoilHealth(n.soil);}).toFixed(0);
+  // A probe reading at or above the fault floor is not a dry field, it is a
+  // probe that is not in the ground. Averaging it in reports 0/100 "soil
+  // health" for hardware that measured nothing, so those nodes are excluded
+  // and the tile shows an em dash when none are left.
+  const soilValid = reporting.filter(n => n.soil < SOIL_FAULT_FLOOR);
+  const faulted = reporting.length - soilValid.length;
+  const avgOf = (arr, fn) => arr.length
+    ? (arr.reduce((s,n)=>s+fn(n),0)/arr.length).toFixed(0) : null;
+  const avgSoil = avgOf(soilValid, n=>n.soil);
+  const avgHealth = avgOf(soilValid, n=>{const l=last(n); return l?l.health:calculateSoilHealth(n.soil);});
   const avgRisk = avg(n=>{const l=last(n); return l?l.risk:0;}).toFixed(0);
   const avgBattery = avg(n=>n.battery).toFixed(0);
   const lowBatteryCount = nodes.filter(n=>n.battery<=BATTERY_LOW_PCT).length;
@@ -1297,12 +1313,13 @@ function renderFleetStats(){
      cls: offlineNodes.length?"bad":""},
     {label:"Active alerts", value:alerted, cls: alerted?"bad":"",
      delta: watching ? `<span class="st-delta">${watching} watching</span>` : ""},
-    {label:"Soil health", value: none?"—":`${avgHealth}<small>/100</small>`,
-     delta: deltaBadge(fleetDelta(h=>h.health, DELTA_WINDOW), true)},
+    {label:"Soil health", value: (none||avgHealth===null)?"—":`${avgHealth}<small>/100</small>`,
+     delta: faulted ? `<span class="st-delta">${faulted} probe fault${faulted>1?"s":""}</span>`
+                    : deltaBadge(fleetDelta(h=>h.health, DELTA_WINDOW), true)},
     {label:"Flood risk", value: none?"—":`${avgRisk}<small>/100</small>`,
      cls: avgRisk>=60?"bad":avgRisk>=35?"warn":"",
      delta: deltaBadge(fleetDelta(h=>h.risk, DELTA_WINDOW), false)},
-    {label:"Soil moisture", value: none?"—":`${avgSoil}<small> ADC</small>`,
+    {label:"Soil moisture", value: (none||avgSoil===null)?"—":`${avgSoil}<small> ADC</small>`,
      delta: deltaBadge(fleetDelta(h=>h.soil, DELTA_WINDOW), null)},
     {label:"Battery", value: none?"—":`${avgBattery}<small>%</small>`,
      cls: lowBatteryCount?"warn":"",
@@ -1347,7 +1364,7 @@ function renderNodesTable(){
     return `<tr style="${offline?'opacity:.6;':''}">
       <td class="n">${n.name}</td>
       <td>${n.direct ? "Direct" : `Via node ${n.relayVia}`}</td>
-      <td><span class="row-badge ${meta.cls}">${meta.label}</span>${n.rapidFlagged && !offline ? ' <span class="row-badge quiet" title="Soil moving fast. Rate threshold not yet calibrated, so this is an observation only.">fast</span>' : ''}</td>
+      <td><span class="row-badge ${meta.cls}">${meta.label}</span>${!offline && !noData && n.soil >= SOIL_FAULT_FLOOR ? ` <span class="row-badge suppressed" title="Soil reads ≥${SOIL_FAULT_FLOOR} — the probe is not in the ground. Soil is excluded from the decision.">probe</span>` : ''}${n.rapidFlagged && !offline ? ' <span class="row-badge quiet" title="Soil moving fast. Rate threshold not yet calibrated, so this is an observation only.">fast</span>' : ''}</td>
       <td>${noData?"—":batteryCellHtml(n)}</td>
       <td class="n">${D(n.soil)}</td>
       <td class="n">${D(n.water)}</td>
@@ -1834,12 +1851,14 @@ function renderPrediction(){
   if (isOffline(node)){
     body.innerHTML = `<div class="predict-empty">${node.name} is offline${node.failReason?` (${node.failReason})`:""}. No current readings to project from — the last values below are stale.</div>`;
     if (predictChart){ predictChart.destroy(); predictChart = null; }
+    renderAdvisory(null, null, null, null, `${node.name} is offline. No advisory — the last reading is stale.`);
     return;
   }
 
   const p = predictNode(node);
   if (!p.ok){
     body.innerHTML = `<div class="predict-empty">${p.reason}</div>`;
+    renderAdvisory(null, null, null, null, p.reason);
     return;
   }
 
@@ -1921,14 +1940,14 @@ function renderPrediction(){
    feed. Swapping the templates for a real model call changes how these
    read, not what they say.
    ========================================================================= */
-function renderAdvisory(node, p, f, a){
+function renderAdvisory(node, p, f, a, reason){
   const sms = document.getElementById("adv-sms");
   const tech = document.getElementById("adv-tech");
   if (!sms) return;
 
   if (!node || !p || !p.ok){
     sms.textContent = "—"; sms.className = "adv-sms";
-    tech.textContent = "Select a node.";
+    tech.textContent = reason || "Select a node.";
     return;
   }
 
