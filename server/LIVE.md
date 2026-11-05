@@ -12,9 +12,13 @@ The base station boots, finds the SIM, and registers — `AT+CPIN: READY`,
 `+CSQ: 13–17/31`, `+CREG: 1`. Then the first `AT+HTTPACTION=0` kills it.
 
 That pattern is a supply collapse, not a firmware fault. The modem draws
-roughly **2A in bursts** when the transmitter fires. A laptop USB port supplies
-**0.5A (USB 2.0) or 0.9A (USB 3.0)**. The voltage drops the moment the PA keys
-up, the board browns out, and the upload never completes.
+roughly **2A in bursts of a few milliseconds** when the transmitter keys up.
+A standard USB-A port is specified for 0.5A (USB 2.0) or 0.9A (USB 3.0);
+some Mac ports give more, but raw amperage is only half the problem — a
+supply several feet down a USB cable cannot answer a millisecond transient
+no matter how it is rated. The voltage dips, the board browns out, and the
+upload never completes. That is why the capacitor below matters as much as
+the supply: it is what actually sources the burst.
 
 `HARDWARE.md` already records this, twice:
 
