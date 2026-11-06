@@ -85,14 +85,52 @@
 #include <avr/pgmspace.h>
 #include <stdarg.h>
 
+// Deployment secrets live in an ignored local header, never in the website bundle.
+#ifdef FMS_DEPLOYMENT_CONFIG
+#include "FmsDeployment.h"
+#endif
+#ifndef FMS_SERVER_HOST
+#define FMS_SERVER_HOST "generations-unix-come-cartridges.trycloudflare.com"
+#endif
+#ifndef FMS_USE_HTTPS
+#define FMS_USE_HTTPS 0
+#endif
+#ifndef FMS_SMS_ENABLED
+#define FMS_SMS_ENABLED 1
+#endif
+#ifndef FMS_API_KEY_NODE_1
+// Deliberately NOT a working key. The point of moving this into the ignored
+// FmsDeployment.h was to keep a live credential out of a public repo, and a
+// fallback default that holds the real one gives that straight back. Build
+// without FmsDeployment.h and uploads fail with 401, which is the correct
+// loud failure -- see FmsDeployment.example.h.
+#define FMS_API_KEY_NODE_1 "REPLACE_WITH_A_NEW_RANDOM_SECRET"
+#endif
+#if FMS_USE_HTTPS
+const char TLS_ROOT_CA[] PROGMEM = R"PEM(-----BEGIN CERTIFICATE-----
+MIICCTCCAY6gAwIBAgINAgPlwGjvYxqccpBQUjAKBggqhkjOPQQDAzBHMQswCQYD
+VQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEUMBIG
+A1UEAxMLR1RTIFJvb3QgUjQwHhcNMTYwNjIyMDAwMDAwWhcNMzYwNjIyMDAwMDAw
+WjBHMQswCQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2Vz
+IExMQzEUMBIGA1UEAxMLR1RTIFJvb3QgUjQwdjAQBgcqhkjOPQIBBgUrgQQAIgNi
+AATzdHOnaItgrkO4NcWBMHtLSZ37wWHO5t5GvWvVYRg1rkDdc/eJkTBa6zzuhXyi
+QHY7qca4R9gq55KRanPpsXI5nymfopjTX15YhmUPoYRlBtHci8nHc8iMai/lxKvR
+HYqjQjBAMA4GA1UdDwEB/wQEAwIBhjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQW
+BBSATNbrdP9JNqPV2Py1PsVq8JQdjDAKBggqhkjOPQQDAwNpADBmAjEA6ED/g94D
+9J+uHXqnLrmvT/aDHQ4thQEd0dlq7A/Cr8deVl5c1RxYIigL9zC2L7F8AjEA8GE8
+p/SgguMh1YQdc4acLa/KNJvxn7kjNuK8YAOdgLOaVsjh4rsUecrNIdSUtUlD
+-----END CERTIFICATE-----
+)PEM";
+#endif
+
 // ============== FEATURE SWITCHES (1 = on, 0 = off if it breaks) ==============
-#define DEMO_MODE              1   // Only a starting guess for the OFFLINE timer. After two packets the base
+#define DEMO_MODE              0   // Only a starting guess for the OFFLINE timer. After two packets the base
                                    // learns each node's own send rate: ~2 s -> OFFLINE after 10 s,
                                    // ~10 s -> OFFLINE after 10 min. So it no longer has to match the nodes.
 #define FORCE_RELAY_FROM_NODE  0   // relay test: ignore packets from this node ID that arrive
                                    // direct (hops=0), forcing them through a relay. 0 = off.
-#define LOW_BATT_SMS           1   // 1: one SMS when a node is CRITICAL + discharging (max 1 per 12 h per node).
-#define STATUS_SMS_ENABLED     1   // 1: reply to "STATUS" texts (checked every 20 s).
+#define LOW_BATT_SMS           FMS_SMS_ENABLED   // 1: one SMS when a node is CRITICAL + discharging (max 1 per 12 h per node).
+#define STATUS_SMS_ENABLED     FMS_SMS_ENABLED   // 1: reply to "STATUS" texts (checked every 20 s).
 #define USE_GNSS_QUERY         0   // 0: map link always uses SITE_LAT_LONG below (no 2 s radio blackout).
                                    // 1: old behaviour - ask the modem for GNSS before every upload/SMS;
                                    //    link shows 0.0,0.0 until the modem has a fix.
@@ -148,12 +186,12 @@ const char CELLULAR_APN[] = "internet";
 
 // --- MULTI-NODE API KEYS ---
 // Put your unique write keys here for each node's channel.
-const char API_KEY_NODE_1[] = "O3JGLAD7IX4P67IE";
+const char API_KEY_NODE_1[] = FMS_API_KEY_NODE_1;
 const char API_KEY_NODE_2[] = "REPLACE_WITH_NODE_2_KEY"; // was missing, added as placeholder
 const char API_KEY_NODE_3[] = "REPLACE_WITH_NODE_3_KEY"; // was missing, added as placeholder
 
 // --- SERVER ENDPOINT (swap these two lines once the custom app is live) ---
-const char SERVER_HOST[] = "generations-unix-come-cartridges.trycloudflare.com";
+const char SERVER_HOST[] = FMS_SERVER_HOST;
 const char SERVER_PATH[] = "/update";
 
 // --- SITE NAMES shown in every SMS (node 1, 2, 3). Keep each under ~25 characters. ---
@@ -705,6 +743,8 @@ void radioWait(unsigned long ms) {
 
 char modemLine[48];            // last line the modem sent, for printing results
 bool modemAlive = false;
+bool cellularContextConfigured = false, tlsConfigured = false;
+uint32_t uploadSession = 0;
 unsigned long lastModemCheck = 0, smsFailedAt = 0;
 
 // Listens to the modem until a line starts with `want` (FOUND), a line contains "ERROR"
@@ -757,11 +797,16 @@ bool modemConnect(uint8_t attempts) {
     wdt_reset();
   }
   sim7600.begin(9600);
-  return false;
+  // The final attempt may just have changed the modem from its boot baud.
+  return modemCommand(F("AT"), PSTR("OK"), 800) == MODEM_FOUND;
 }
 
 // Settings the modem forgets on every power-up (same commands the old setup sent).
 void modemConfigure() {
+  cellularContextConfigured = false;
+  tlsConfigured = false;
+  modemCommand(F("ATE0"), PSTR("OK"), 1000);
+  modemCommand(F("AT+CTZU=1"), PSTR("OK"), 1000);
   modemCommand(F("AT+CMGF=1"), PSTR("OK"), 1000);
 #if STATUS_SMS_ENABLED
   modemCommand(F("AT+CPMS=\"SM\",\"SM\",\"SM\""), PSTR("OK"), 2000);
@@ -827,6 +872,7 @@ void printModemStatus() {
 void checkModemAfterFailure() {
   if (modemCommand(F("AT"), PSTR("OK"), 1000) != MODEM_FOUND) {
     modemAlive = false;
+    cellularContextConfigured = false; tlsConfigured = false;
     lastModemCheck = millis();
     Serial.println(F("SIM module stopped answering - will look for it every 60 s"));
   }
@@ -865,6 +911,10 @@ void updateGPS() {
 // and for "+CMGS" (network accepted it) after. Returns how many phones it reached.
 // Phone numbers are not printed, so they never show up on camera.
 uint8_t sendSMS(const char *message) {
+#if !FMS_SMS_ENABLED
+  Serial.println(F("SMS disabled for web-upload deployment"));
+  return 0;
+#endif
   if (strlen(message) > 160) {   // can't happen with smsBuf[161], but never send a split SMS
     Serial.println(F("SMS too long - not sent"));
     return 0;
@@ -1098,28 +1148,115 @@ int calculateSoilHealth(int soilMoisture) {
   return constrain(healthScore, 0, 100);
 }
 
+bool httpSetupCommand(const __FlashStringHelper *command) {
+  int8_t result = modemCommand(command, PSTR("OK"), 10000UL);
+  if (result == MODEM_FOUND) return true;
+  Serial.print(F("HTTP setup failed: ")); Serial.println(modemLine);
+  if (result == MODEM_TIMEOUT) checkModemAfterFailure();
+  hc12.listen();
+  return false;
+}
+
+#if FMS_USE_HTTPS
+bool configureTls() {
+  if (tlsConfigured) return true;
+  Serial.println(F("TLS: loading trusted root certificate"));
+  sim7600.listen();
+  sim7600.print(F("AT+CCERTDOWN=\"fms-root.pem\","));
+  sim7600.println(sizeof(TLS_ROOT_CA) - 1);
+  if (modemWaitFor(PSTR(">"), 10000UL) != MODEM_FOUND) {
+    Serial.print(F("TLS certificate prompt failed: ")); Serial.println(modemLine);
+    checkModemAfterFailure(); hc12.listen(); return false;
+  }
+  for (uint16_t i = 0; i < sizeof(TLS_ROOT_CA) - 1; i++) {
+    wdt_reset();
+    sim7600.write(pgm_read_byte(TLS_ROOT_CA + i));
+  }
+  if (modemWaitFor(PSTR("OK"), 10000UL) != MODEM_FOUND) {
+    Serial.println(F("TLS certificate download failed"));
+    checkModemAfterFailure(); hc12.listen(); return false;
+  }
+  if (!httpSetupCommand(F("AT+CSSLCFG=\"sslversion\",0,3")) ||
+      !httpSetupCommand(F("AT+CSSLCFG=\"authmode\",0,1")) ||
+      !httpSetupCommand(F("AT+CSSLCFG=\"ignorelocaltime\",0,0")) ||
+      !httpSetupCommand(F("AT+CSSLCFG=\"enableSNI\",0,1")) ||
+      !httpSetupCommand(F("AT+CSSLCFG=\"cacert\",0,\"fms-root.pem\""))) return false;
+  tlsConfigured = true;
+  return true;
+}
+#endif
+
+// A76XX HTTPINIT can take up to 120 seconds to activate its PDP context.
+// Wait for each response; sending URL/ACTION while INIT is busy loses commands.
+bool prepareHttp() {
+  pollRadio();
+  sim7600.listen();
+  if (!cellularContextConfigured) {
+  sim7600.print(F("AT+CGDCONT=1,\"IP\",\""));
+  sim7600.print(CELLULAR_APN);
+  sim7600.println(F("\""));
+  int8_t setupResult = modemWaitFor(PSTR("OK"), 10000);
+  if (setupResult != MODEM_FOUND) {
+    Serial.print(F("HTTP APN setup failed: ")); Serial.println(modemLine);
+    if (setupResult == MODEM_TIMEOUT) checkModemAfterFailure();
+    hc12.listen();
+    return false;
+  }
+  cellularContextConfigured = true;
+  }
+#if FMS_USE_HTTPS
+  if (!configureTls()) return false;
+#endif
+  // ERROR is normal when no HTTP session exists; a timeout is not.
+  if (modemCommand(F("AT+HTTPTERM"), PSTR("OK"), 120000UL) == MODEM_TIMEOUT) {
+    Serial.println(F("HTTP cleanup timed out"));
+    checkModemAfterFailure();
+    hc12.listen();
+    return false;
+  }
+  int8_t setupResult = modemCommand(F("AT+HTTPINIT"), PSTR("OK"), 120000UL);
+  if (setupResult != MODEM_FOUND) {
+    Serial.print(F("HTTP initialization failed: ")); Serial.println(modemLine);
+    if (setupResult == MODEM_TIMEOUT) checkModemAfterFailure();
+    hc12.listen();
+    return false;
+  }
+#if FMS_USE_HTTPS
+  if (!httpSetupCommand(F("AT+HTTPPARA=\"SSLCFG\",0"))) return false;
+#endif
+  if (!httpSetupCommand(F("AT+HTTPPARA=\"USERDATA\",\"User-Agent: FMS-Base/1.0\"")) ||
+      !httpSetupCommand(F("AT+HTTPPARA=\"CONNECTTO\",20")) ||
+      !httpSetupCommand(F("AT+HTTPPARA=\"RECVTO\",20"))) return false;
+  return true;
+}
+
+bool finishHttpUrl() {
+  if (modemWaitFor(PSTR("OK"), 5000) == MODEM_FOUND) return true;
+  Serial.print(F("HTTP URL setup failed: ")); Serial.println(modemLine);
+  modemCommand(F("AT+HTTPTERM"), PSTR("OK"), 120000UL);
+  hc12.listen();
+  return false;
+}
+
 // --- DYNAMIC ROUTING, CONFIGURABLE SERVER ---
 // Same AT sequence and URL as before, printed piece by piece instead of built in a String.
-void sendToThingSpeak(const NodeInfo &n, int healthIndex) {
+bool sendToThingSpeak(const NodeInfo &n, int healthIndex) {
   const char *targetKey;
 
   if (n.id == 1) targetKey = API_KEY_NODE_1;
   else if (n.id == 2) targetKey = API_KEY_NODE_2;
   else if (n.id == 3) targetKey = API_KEY_NODE_3;
-  else return; // Ignore unknown nodes
+  else return false; // Ignore unknown nodes
 
-  pollRadio();
-  sim7600.listen();
-  sim7600.print(F("AT+CGDCONT=1,\"IP\",\""));
-  sim7600.print(CELLULAR_APN);
-  sim7600.println(F("\""));
-  radioWait(1000);
-  sim7600.println(F("AT+HTTPINIT"));
-  radioWait(500);
+  if (!prepareHttp()) return false;
 
   // Uses SERVER_HOST/SERVER_PATH so this can point at the new app later
   // by changing two constants at the top of the file, nothing here.
+#if FMS_USE_HTTPS
+  sim7600.print(F("AT+HTTPPARA=\"URL\",\"https://"));
+#else
   sim7600.print(F("AT+HTTPPARA=\"URL\",\"http://"));
+#endif
   sim7600.print(SERVER_HOST);
   sim7600.print(SERVER_PATH);
   sim7600.print(F("?api_key="));
@@ -1142,16 +1279,19 @@ void sendToThingSpeak(const NodeInfo &n, int healthIndex) {
 
   // latLong is "lat,long" -> &lat=XX&long=YY
   const char *comma = strchr(latLong, ',');
+  sim7600.print(F("&sample_id=")); sim7600.print(uploadSession, HEX);
+  sim7600.print('-'); sim7600.print(n.lastHeard); sim7600.print('-'); sim7600.print(n.lastSeq);
+  sim7600.print(F("&age_ms=")); sim7600.print(millis() - n.lastHeard);
   sim7600.print(F("&lat="));
   if (comma) sim7600.write((const uint8_t *)latLong, comma - latLong);
   sim7600.print(F("&long="));
   if (comma) sim7600.print(comma + 1);
   sim7600.println(F("\""));
-  radioWait(1000);
+  if (!finishHttpUrl()) return false;
 
-  // Wait for the server's answer (up to 10 s) instead of a fixed 2 s: cellular requests often
-  // take longer, and AT+HTTPTERM would cancel them. "+HTTPACTION: 0,200,<len>" = accepted.
-  int8_t r = modemCommand(F("AT+HTTPACTION=0"), PSTR("+HTTPACTION:"), 10000);
+  // Wait for the asynchronous HTTP result before terminating the session.
+  // Initialization and connection can take much longer than a fixed delay. "+HTTPACTION: 0,200,<len>" = accepted.
+  int8_t r = modemCommand(F("AT+HTTPACTION=0"), PSTR("+HTTPACTION:"), 150000UL);
   int code = -1;
   if (r == MODEM_FOUND) {
     char *c = strchr(modemLine, ',');
@@ -1164,16 +1304,19 @@ void sendToThingSpeak(const NodeInfo &n, int healthIndex) {
   } else if (code > 0) {
     Serial.print(F(": FAILED (HTTP "));
     Serial.print(code);
-    Serial.println(code >= 600 ? F(" - no data connection? check APN and data plan)") : F(")"));
+    if (code == 713 || code == 603) Serial.println(F(" - DNS lookup failed)"));
+    else if (code == 714) Serial.println(F(" - socket connection failed)"));
+    else if (code == 717) Serial.println(F(" - no network)"));
+    else Serial.println(code >= 600 ? F(" - modem error)") : F(")"));
   } else {
     Serial.print(F(": FAILED ("));
     Serial.print(modemLine);
     Serial.println(')');
   }
-  sim7600.println(F("AT+HTTPTERM"));
-  radioWait(500);
+  modemCommand(F("AT+HTTPTERM"), PSTR("OK"), 120000UL);
   if (r == MODEM_TIMEOUT) checkModemAfterFailure();
   hc12.listen();
+  return code == 200;
 }
 
 #if STATUS_SMS_ENABLED
@@ -1297,7 +1440,10 @@ void processNodes() {
     updateGPS();
 #endif
     // --- ROUTE DATA TO CORRECT DASHBOARD/APP ---
-    sendToThingSpeak(n, calculateSoilHealth(n.soil));
+    if (!sendToThingSpeak(n, calculateSoilHealth(n.soil))) {
+      n.state |= ST_UPLOAD_PENDING; // retain the latest reading for a paced retry
+    }
+    n.lastUpload = millis(); // pace retries from completion, including long timeouts
     return;
   }
 #endif
@@ -1353,24 +1499,25 @@ void testCellular() {
     Serial.println(F("test: modem is not responding - check its power first"));
     return;
   }
+#if FMS_USE_HTTPS
+  Serial.print(F("test: GET https://"));
+#else
   Serial.print(F("test: GET http://"));
+#endif
   Serial.print(SERVER_HOST);
   Serial.println(F("/health"));
 
-  pollRadio();
-  sim7600.listen();
-  sim7600.print(F("AT+CGDCONT=1,\"IP\",\""));
-  sim7600.print(CELLULAR_APN);
-  sim7600.println(F("\""));
-  radioWait(1000);
-  sim7600.println(F("AT+HTTPINIT"));
-  radioWait(500);
+  if (!prepareHttp()) return;
+#if FMS_USE_HTTPS
+  sim7600.print(F("AT+HTTPPARA=\"URL\",\"https://"));
+#else
   sim7600.print(F("AT+HTTPPARA=\"URL\",\"http://"));
+#endif
   sim7600.print(SERVER_HOST);
   sim7600.println(F("/health\""));
-  radioWait(1000);
+  if (!finishHttpUrl()) return;
 
-  int8_t r = modemCommand(F("AT+HTTPACTION=0"), PSTR("+HTTPACTION:"), 10000);
+  int8_t r = modemCommand(F("AT+HTTPACTION=0"), PSTR("+HTTPACTION:"), 150000UL);
   int code = -1;
   if (r == MODEM_FOUND) {
     char *c = strchr(modemLine, ',');
@@ -1386,7 +1533,9 @@ void testCellular() {
   } else if (code >= 600) {
     Serial.print(F("FAILED (HTTP "));
     Serial.print(code);
-    Serial.println(F(") - request never left the modem. Check APN and data plan."));
+    if (code == 713 || code == 603) Serial.println(F(") - DNS lookup failed."));
+    else if (code == 714) Serial.println(F(") - socket connection failed."));
+    else Serial.println(F(") - modem error; check its documented result code."));
   } else if (code > 0) {
     Serial.print(F("reached a server, HTTP "));
     Serial.println(code);
@@ -1395,8 +1544,7 @@ void testCellular() {
     Serial.print(modemLine);
     Serial.println(')');
   }
-  sim7600.println(F("AT+HTTPTERM"));
-  radioWait(500);
+  modemCommand(F("AT+HTTPTERM"), PSTR("OK"), 120000UL);
   if (r == MODEM_TIMEOUT) checkModemAfterFailure();
   hc12.listen();
 }
@@ -1461,6 +1609,9 @@ void printStartupWarnings() {
 
 void setup() {
   Serial.begin(9600);
+  // A session nonce plus packet uptime/sequence gives retries stable IDs.
+  uploadSession = micros();
+  for (uint8_t i = 0; i < 32; i++) uploadSession ^= analogRead(A7) + (uploadSession << 6) + (uploadSession >> 2) + micros();
   hc12.begin(9600);
   sim7600.begin(9600);
   Serial.println(F("Base Module Starting..."));

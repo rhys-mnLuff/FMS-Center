@@ -1,2 +1,5 @@
 .DS_Store
 server/*.db
+
+# Private firmware deployment configuration
+FmsDeployment.h

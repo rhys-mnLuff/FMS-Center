@@ -1,0 +1,27 @@
+Base Module Starting...
+SIM module: connecting (up to 15 s while it boots)...
+==== FMS BASE STATION (packet v2) ====
+node OFFLINE after 10 s (if it sends every ~2 s) or 10 min (every ~10 s)
+flood SMS max 1/hour | low-battery SMS OFF | STATUS texts OFF
+alert rule: water > 30 or soil <= 436, held 3 readings; clears at soil > 470 and water <= 30
+risk levels ON (display only): NORMAL / WATCH / WARNING / FLOOD, ThingSpeak field8
+ThingSpeak uploads ON
+map location: provisioned SITE_LAT_LONG
+SIM module: OK | SIM card ready | signal 13/31 ok | network registered
+WARNING: API_KEY_NODE_2 is a placeholder - node 2 uploads will fail
+WARNING: API_KEY_NODE_3 is a placeholder - node 3 uploads will fail
+COMMANDS  n node table | m modem status | t test cellular | v duplicates | h help
+Listening for nodes...
+NODE 1 | hops 0 | soil 1008 | water 8 | rain NONE | batt 23% discharging | risk NORMAL
+NODE 1 power | 3.74V | 10-min avg -23mA | est. 22.0h left
+HTTP stage: APN
+HTTP APN setup failed: no reply
+HTTP stage: APN
+HTTP APN setup failed: no reply
+NODE 1 | hops 0 | soil 1008 | water 8 | rain NONE | batt 24% discharging | risk NORMAL
+HTTP stage: APN
+HTTP APN setup failed: no reply
+NODE 1 | hops 0 | soil 598 | water 9 | rain NONE | batt 25% discharging | risk NORMAL
+NODE 1 power | 3.75V | 10-min avg -26mA | est. 21.1h left
+HTTP stage: APN
+HTTP APN setup failed: no reply

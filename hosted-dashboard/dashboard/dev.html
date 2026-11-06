@@ -1,0 +1,2788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FMS Live Field Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<style>
+  /* Layout: a fixed sidebar beside a scrolling column of cards on a soft
+     neutral page. Surfaces are white, generously padded and lightly
+     rounded; colour is reserved for state. */
+  :root{
+    --bg:#f3f4f2; --bg-soft:#f0f1ee; --card:#ffffff; --card-border:#e7e8e3;
+    --ink:#1a211d; --ink-soft:#4d5751; --muted:#8c948e; --line:#eeefea;
+    --green:#1d7a54; --green-bg:#e7f4ed; --accent:#62b58c;
+    --amber:#8a6210; --amber-bg:#fbf1dc;
+    --red:#b23b2d; --red-bg:#fbeae7;
+    --water:#2b6490; --water-bg:#e9f0f6;
+    --purple:#5b4ea8; --purple-bg:#ece9f7;
+    --radius:16px; --radius-sm:11px; --radius-xs:8px;
+    --map-filter:saturate(.3) contrast(1.02) brightness(1.03);
+    --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0e1211; --bg-soft:#171c1a; --card:#151a18; --card-border:#242b28;
+      --ink:#e6eae7; --ink-soft:#a8b2ad; --muted:#6f7a74; --line:#222927;
+      --green:#4cba88; --green-bg:#122b21; --accent:#4cba88;
+      --amber:#d7a44a; --amber-bg:#2c2413;
+      --red:#e07262; --red-bg:#301b18;
+      --water:#5da5db; --water-bg:#122534;
+      --purple:#9b8ce0; --purple-bg:#1d1930;
+      --map-filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.95) saturate(.3);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1211; --bg-soft:#171c1a; --card:#151a18; --card-border:#242b28;
+    --ink:#e6eae7; --ink-soft:#a8b2ad; --muted:#6f7a74; --line:#222927;
+    --green:#4cba88; --green-bg:#122b21; --accent:#4cba88;
+    --amber:#d7a44a; --amber-bg:#2c2413;
+    --red:#e07262; --red-bg:#301b18;
+    --water:#5da5db; --water-bg:#122534;
+    --purple:#9b8ce0; --purple-bg:#1d1930;
+    --map-filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.95) saturate(.3);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  html{scroll-behavior:smooth; scroll-padding-top:18px;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    min-height:100vh; font-size:13.5px; -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4,h5{font-family:inherit; margin:0; letter-spacing:-0.015em;}
+  /* Figures that sit in columns stay monospaced (td.n) so a changing digit
+     doesn't shuffle the row beside it. Headline figures use the UI face with
+     tabular numerals, which reads calmer at display size. */
+  code{font-family:var(--mono); font-size:.92em; background:var(--bg-soft); padding:1px 5px; border-radius:5px;}
+  a{color:var(--water);}
+  svg.icon{width:1em;height:1em;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;vertical-align:-0.15em;}
+
+  /* ---------- shell ---------- */
+  .sidebar{
+    position:fixed; top:12px; left:12px; bottom:12px; width:218px; z-index:40;
+    background:var(--card); border:1px solid var(--card-border); border-radius:18px;
+    padding:16px 12px 14px; display:flex; flex-direction:column; gap:14px;
+  }
+  .sb-brand{display:flex; align-items:center; gap:9px; padding:4px 8px 2px;}
+  .sb-mark{width:26px; height:26px; border-radius:8px; background:var(--ink); color:var(--card);
+    display:flex; align-items:center; justify-content:center; flex:none;}
+  .sb-mark svg{width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;}
+  .sb-brand b{font-size:14.5px; font-weight:600; letter-spacing:-0.02em;}
+  .sb-nav{display:flex; flex-direction:column; gap:1px; overflow-y:auto; flex:1; margin:0 -2px;}
+  .sb-nav a{
+    display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px;
+    font-size:13px; color:var(--ink-soft); text-decoration:none; font-weight:450;
+  }
+  .sb-nav a svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex:none; opacity:.8;}
+  .sb-nav a:hover{background:var(--bg-soft); color:var(--ink);}
+  .sb-nav a.on{background:var(--bg-soft); color:var(--ink); font-weight:550;}
+  .sb-nav a.on svg{opacity:1; color:var(--green);}
+  .sb-foot{border-top:1px solid var(--line); padding-top:10px; display:flex; flex-direction:column; gap:3px;}
+  .sb-foot a, .sb-foot button{
+    display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px;
+    font-size:13px; color:var(--ink-soft); text-decoration:none; font-weight:450;
+    background:transparent; border:none; cursor:pointer; font-family:inherit; width:100%; text-align:left;
+  }
+  .sb-foot a svg, .sb-foot button svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex:none; opacity:.8;}
+  .sb-foot a:hover, .sb-foot button:hover{background:var(--bg-soft); color:var(--ink);}
+  .icon-moon{display:none;}
+  :root[data-theme="dark"] .icon-sun{display:none;}
+  :root[data-theme="dark"] .icon-moon{display:block;}
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]) .icon-sun{display:none;}
+    :root:not([data-theme="light"]) .icon-moon{display:block;}
+  }
+
+  .main{margin-left:246px; padding:22px 24px 56px; max-width:1560px;}
+  @media (max-width:960px){
+    .sidebar{position:static; width:auto; margin:10px 10px 0; bottom:auto; flex-direction:row;
+      align-items:center; gap:10px; padding:10px 12px; border-radius:14px;}
+    .sb-nav{flex-direction:row; overflow-x:auto; gap:2px; flex:1;}
+    .sb-nav a{white-space:nowrap; padding:7px 10px;}
+    .sb-nav a svg{display:none;}
+    .sb-foot{border-top:none; border-left:1px solid var(--line); padding:0 0 0 10px; flex-direction:row;}
+    .sb-foot a span, .sb-foot button span{display:none;}
+    .main{margin-left:0; padding:16px 12px 48px;}
+  }
+
+  /* ---------- page head ---------- */
+  .page-head{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin:4px 2px 20px;}
+  .page-head h1{font-size:27px; font-weight:600; letter-spacing:-0.03em;}
+  .head-right{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .hpill{
+    display:inline-flex; align-items:center; gap:7px; background:var(--card);
+    border:1px solid var(--card-border); border-radius:999px; padding:7px 14px;
+    font-size:12.5px; color:var(--ink-soft); font-weight:450;
+  }
+  .hpill svg{width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; opacity:.75;}
+  .hpill #clock{font-variant-numeric:tabular-nums;}
+  .hpill i{width:7px; height:7px; border-radius:50%; background:var(--muted); flex:none;}
+  .hpill.live i{background:var(--green); box-shadow:0 0 0 3px var(--green-bg);}
+
+  /* ---------- toolbar ---------- */
+  .toolbar{
+    display:flex; align-items:center; gap:7px; flex-wrap:wrap;
+    background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius);
+    padding:9px 11px; margin-bottom:22px;
+  }
+  .seg{display:inline-flex; background:var(--bg-soft); border-radius:999px; padding:3px; gap:2px;}
+  .seg button{
+    background:transparent; border:none; color:var(--muted); font-family:inherit;
+    padding:5px 12px; border-radius:999px; font-size:12px; font-weight:500; cursor:pointer;
+  }
+  .seg button:hover{color:var(--ink);}
+  .seg button.active{background:var(--card); color:var(--ink); box-shadow:0 1px 2px rgba(0,0,0,.05);}
+  .toolbar .tbtn{
+    background:transparent; border:1px solid var(--card-border); color:var(--ink-soft);
+    padding:6px 13px; border-radius:999px; font-size:12px; font-weight:500; cursor:pointer; font-family:inherit;
+  }
+  .toolbar .tbtn:hover{border-color:var(--muted); color:var(--ink);}
+  .toolbar .tbtn.active{background:var(--ink); color:var(--card); border-color:var(--ink);}
+  .toolbar .spacer{flex:1;}
+
+  /* Created at runtime by setLiveBanner() / startDemo(). */
+  .demo-banner{
+    font-size:12.5px; line-height:1.55; color:var(--ink-soft);
+    background:var(--card); border:1px solid var(--card-border); border-left:3px solid var(--accent);
+    border-radius:var(--radius-sm); padding:12px 15px; margin-bottom:18px;
+  }
+  .demo-banner b{color:var(--ink);}
+
+  .section-title{display:flex; align-items:baseline; justify-content:space-between; margin:30px 2px 12px; flex-wrap:wrap; gap:6px;}
+  .section-title h2{font-size:16px; font-weight:600; letter-spacing:-0.02em; color:var(--ink);}
+  .section-title span{font-size:12px; color:var(--muted);}
+
+  /* ---------- stat tiles ---------- */
+  .stat-grid{display:grid; grid-template-columns:repeat(6,1fr); gap:10px;}
+  #economics-stats{grid-template-columns:repeat(4,1fr);}
+  @media (max-width:1240px){ .stat-grid, #economics-stats{grid-template-columns:repeat(3,1fr);} }
+  @media (max-width:720px){ .stat-grid, #economics-stats{grid-template-columns:repeat(2,1fr);} }
+  .stat-tile{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:15px 17px 16px; min-width:0;}
+  .stat-tile .st-top{display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:21px;}
+  .stat-tile .st-label{font-size:12.5px; color:var(--muted); font-weight:450; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .stat-tile .st-delta{font-size:11.5px; font-weight:600; padding:2px 8px; border-radius:999px; background:var(--bg-soft); color:var(--muted); flex:none;}
+  .stat-tile .st-delta.up{background:var(--green-bg); color:var(--green);}
+  .stat-tile .st-delta.down{background:var(--red-bg); color:var(--red);}
+  .stat-tile .st-value{font-size:25px; font-weight:600; font-variant-numeric:tabular-nums; margin-top:9px; letter-spacing:-.035em; color:var(--ink); line-height:1.1;}
+  .stat-tile .st-value small{font-size:14px; font-weight:500; color:var(--muted); letter-spacing:0;}
+  .stat-tile.warn .st-value{color:var(--amber);}
+  .stat-tile.bad .st-value{color:var(--red);}
+
+  /* ---------- tables ---------- */
+  .table-wrap{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); overflow-x:auto; padding:4px 6px;}
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th,td{padding:11px 12px; text-align:left; border-bottom:1px dashed var(--line); white-space:nowrap;}
+  th{color:var(--muted); font-weight:500; font-size:12px; letter-spacing:0; background:transparent;}
+  td{color:var(--ink-soft);}
+  td.n{color:var(--ink); font-weight:550; font-family:var(--mono); font-size:12px;}
+  tr:last-child td{border-bottom:none;}
+  .row-badge{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:550;padding:3px 9px;border-radius:999px;background:var(--green-bg);color:var(--green);}
+  .row-badge.watch{background:var(--amber-bg);color:var(--amber);}
+  .row-badge.alert{background:var(--red-bg);color:var(--red);}
+  .row-badge.planned{background:var(--bg-soft);color:var(--muted);font-weight:500;}
+  .row-badge.quiet{background:transparent; color:var(--muted); border:none; padding-left:4px;}
+  .row-badge.suppressed{background:var(--amber-bg);color:var(--amber);}
+  .row-badge.state{background:var(--water-bg);color:var(--water);}
+  .row-badge.offline{background:var(--bg-soft);color:var(--muted);}
+  .row-badge.failure{background:var(--red-bg);color:var(--red);}
+
+  .battery-cell{display:flex; align-items:center; gap:7px;}
+  .battery-bar{width:40px; height:6px; border-radius:999px; background:var(--bg-soft); overflow:hidden; flex:none;}
+  .battery-fill{height:100%; background:var(--accent); border-radius:999px;}
+  .battery-fill.warn{background:var(--amber);}
+  .battery-fill.bad{background:var(--red);}
+  .battery-pct{font-variant-numeric:tabular-nums; font-size:12px; color:var(--ink-soft); min-width:30px;}
+
+  .action-btn{
+    background:transparent; border:1px solid var(--card-border); color:var(--ink-soft);
+    padding:4px 11px; border-radius:999px; font-size:11.5px; font-weight:500; cursor:pointer; font-family:inherit;
+  }
+  .action-btn:hover{border-color:var(--muted); color:var(--ink);}
+  .action-btn.restore{background:var(--green); color:#fff; border-color:var(--green);}
+
+  /* ---------- panels ---------- */
+  .panel, .chart-card, .nd-card, .diag-card, .rain-card{
+    background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:18px 20px; min-width:0;
+  }
+  .panel h4, .chart-card h4{font-size:14px; margin:0 0 2px; font-weight:600; letter-spacing:-0.015em;}
+  .panel .c-sub, .chart-card .c-sub{font-size:12px; color:var(--muted); margin-bottom:12px;}
+
+  .diag-card{margin-bottom:10px;}
+  .diag-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;}
+  .diag-grade{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:5px 13px;border-radius:999px;}
+  .diag-grade.good{background:var(--green-bg);color:var(--green);}
+  .diag-grade.fair{background:var(--amber-bg);color:var(--amber);}
+  .diag-grade.poor{background:var(--red-bg);color:var(--red);}
+  .diag-time{font-size:12px; color:var(--muted);}
+  .diag-lines{display:flex; flex-direction:column; gap:7px; margin-bottom:12px;}
+  .diag-line{display:flex; gap:9px; font-size:12.5px; align-items:flex-start; color:var(--ink-soft);}
+  .diag-line .dl-dot{width:7px;height:7px;border-radius:50%;flex:none;margin-top:5px;}
+  .diag-line.ok .dl-dot{background:var(--accent);}
+  .diag-line.warn .dl-dot{background:var(--amber);}
+  .diag-line.bad .dl-dot{background:var(--red);}
+  .diag-rec{background:var(--bg-soft); border-radius:var(--radius-sm); padding:12px 14px; font-size:12.5px; color:var(--ink-soft); line-height:1.6;}
+  .diag-rec ul{margin:4px 0 0; padding-left:17px;}
+  .diag-empty{text-align:center; color:var(--muted); font-size:13px; padding:34px 10px; background:var(--card);
+    border:1px solid var(--card-border); border-radius:var(--radius);}
+
+  /* ---------- charts ---------- */
+  /* Two even columns with the odd card out spanning both, rather than
+     auto-fit leaving a half-width orphan on the last row. */
+  .chart-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px;}
+  .chart-grid > *{min-width:0;}
+  .chart-grid > *:last-child:nth-child(odd){grid-column:1/-1;}
+  @media (max-width:900px){ .chart-grid{grid-template-columns:1fr;} }
+  .chart-card canvas{max-height:190px; max-width:100%;}
+  .chart-legend{display:flex; gap:16px; margin-top:12px; flex-wrap:wrap; padding-left:2px;}
+  .chart-legend .li{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);font-weight:450;}
+  .chart-legend i{width:8px;height:8px;border-radius:50%;display:inline-block;}
+
+  /* ---------- advisory ---------- */
+  .advisory{display:grid; grid-template-columns:1.1fr .9fr; gap:12px;}
+  @media (max-width:900px){ .advisory{grid-template-columns:1fr;} }
+  .adv-col{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:18px 20px; min-width:0;}
+  .adv-sms{font-size:15px; line-height:1.6; color:var(--ink); font-weight:450; letter-spacing:-0.01em;}
+  .adv-sms.warn{color:var(--amber);} .adv-sms.bad{color:var(--red);}
+  .adv-tech{font-size:12.5px; color:var(--ink-soft); line-height:1.65;}
+  .adv-tech ul{margin:0; padding-left:16px;}
+  .adv-tech li{margin-bottom:4px;}
+  .adv-tech b{font-variant-numeric:tabular-nums; color:var(--ink); font-weight:600;}
+
+  /* ---------- flood prediction ---------- */
+  .predict-wrap{display:grid; grid-template-columns:minmax(300px,.8fr) 1.2fr; gap:12px; align-items:stretch;}
+  .predict-wrap > *{min-width:0;}
+  @media (max-width:1040px){ .predict-wrap{grid-template-columns:1fr;} }
+  .predict-map-panel{display:flex; flex-direction:column;}
+  .predict-map-panel #map{flex:1; min-height:300px; height:auto;}
+  .map-legend{display:flex; flex-wrap:wrap; gap:14px; margin-top:12px; font-size:12px; color:var(--muted);}
+  .map-legend i{display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:baseline;}
+  .predict-head{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:14px;}
+  .node-chips{display:flex; gap:5px; flex-wrap:wrap;}
+  .node-chip{
+    background:transparent; border:1px solid var(--card-border); color:var(--ink-soft);
+    padding:5px 12px; border-radius:999px; font-size:12px; font-weight:450;
+    cursor:pointer; font-family:inherit; display:flex; align-items:center; gap:7px;
+  }
+  .node-chip:hover{border-color:var(--muted); color:var(--ink);}
+  .node-chip.active{background:var(--ink); color:var(--card); border-color:var(--ink);}
+  .node-chip i{width:7px; height:7px; border-radius:50%; flex:none;}
+  .predict-empty{
+    color:var(--muted); font-size:13px; line-height:1.6; padding:40px 18px;
+    text-align:center; background:var(--bg-soft); border-radius:var(--radius-sm);
+  }
+  .verdict{display:flex; gap:20px; align-items:baseline; padding:2px 0 16px; margin-bottom:14px; border-bottom:1px solid var(--line);}
+  .verdict .v-eta{font-size:30px; font-weight:600; line-height:1; white-space:nowrap; letter-spacing:-.035em; min-width:104px; font-variant-numeric:tabular-nums;}
+  .verdict.calm .v-eta{color:var(--ink);} .verdict.watch .v-eta{color:var(--amber);} .verdict.urgent .v-eta{color:var(--red);}
+  .verdict .v-text{font-size:13px; line-height:1.6; color:var(--ink-soft);}
+  .verdict .v-text b{color:var(--ink); font-weight:600;}
+  .predict-metrics{display:grid; grid-template-columns:repeat(7,1fr); gap:10px; margin-bottom:14px;}
+  @media (max-width:1180px){ .predict-metrics{grid-template-columns:repeat(4,1fr);} }
+  @media (max-width:640px){ .predict-metrics{grid-template-columns:repeat(2,1fr);} }
+  .pm{background:var(--bg-soft); border-radius:var(--radius-xs); padding:10px 12px; min-width:0;}
+  .pm .k{font-size:11.5px; color:var(--muted); font-weight:450; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .pm .v{font-size:17px; font-weight:600; margin-top:3px; font-variant-numeric:tabular-nums; line-height:1.25; letter-spacing:-.03em;}
+  .pm .s{font-size:11px; color:var(--muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .predict-chart-box{height:200px; margin-bottom:12px; min-width:0; position:relative;}
+  .predict-chart-box canvas{position:absolute; inset:0; width:100%!important; height:100%!important;}
+  .cascade{display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:16px;}
+  .cs{font-size:11.5px; padding:5px 12px; color:var(--muted); background:var(--bg-soft); border-radius:999px; white-space:nowrap;}
+  .cs.due{color:var(--ink-soft);}
+  .cs.on{background:var(--ink); color:var(--card); font-weight:550;}
+  /* Marks a figure taken from literature rather than our own bench tests. */
+  .est{font-size:11px; color:var(--muted); font-style:italic;}
+
+  /* ---------- per-node cards ---------- */
+  /* Grid items default to min-width:auto, which lets a canvas's intrinsic
+     width push the track wider than 1fr and overflow the page. Every level
+     that wraps a chart has to opt out of that. */
+  .node-detail-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:12px;}
+  .node-detail-grid > *{min-width:0;}
+  .nd-card{overflow:hidden;}
+  .nd-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:14px;}
+  .nd-name{font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px; letter-spacing:-0.015em;}
+  .nd-name i{width:8px; height:8px; border-radius:50%; flex:none;}
+  .nd-sub{font-size:11.5px; color:var(--muted); margin-top:3px;}
+  .nd-health{text-align:right; flex:none;}
+  .nd-health .h-val{font-size:23px; font-weight:600; line-height:1; font-variant-numeric:tabular-nums; color:var(--ink); letter-spacing:-.035em;}
+  .nd-health .h-lab{font-size:11.5px; color:var(--muted); margin-top:5px;}
+  .nd-health.mid .h-val{color:var(--amber);} .nd-health.bad .h-val{color:var(--red);}
+  .nd-charts{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  .nd-charts > *{min-width:0;}
+  @media (max-width:520px){ .nd-charts{grid-template-columns:1fr;} }
+  .nd-chart h5{font-size:12px; font-weight:500; margin:0 0 1px; color:var(--muted); letter-spacing:0;}
+  .nd-chart .nd-cs{font-size:11.5px; color:var(--ink-soft); margin-bottom:6px; font-variant-numeric:tabular-nums;}
+  .nd-chart-box{height:84px; min-width:0; position:relative;}
+  .nd-chart-box canvas{position:absolute; inset:0; width:100%!important; height:100%!important;}
+
+  /* ---------- rain ---------- */
+  .rain-head{display:flex; align-items:center; gap:10px; margin-bottom:18px; flex-wrap:wrap;}
+  .rain-head .rh-icon{display:none;}
+  .rain-head h3{font-size:14px; font-weight:600; letter-spacing:-0.015em;}
+  .rain-body{display:grid; grid-template-columns:auto 1fr; gap:28px; align-items:center;}
+  @media (max-width:720px){ .rain-body{grid-template-columns:1fr; justify-items:start; gap:18px;} }
+  .rain-headline{flex:none; min-width:96px;}
+  .rain-headline .rgd-value{font-size:32px; font-weight:600; line-height:1; font-variant-numeric:tabular-nums; letter-spacing:-.035em;}
+  .rain-headline .rgd-label{font-size:12px; color:var(--muted); margin-top:6px;}
+  .rain-stats{display:grid; grid-template-columns:repeat(4,minmax(0,150px)); gap:10px;}
+  @media (max-width:720px){ .rain-stats{grid-template-columns:repeat(2,1fr); width:100%;} }
+  .rain-stat-row{display:flex; flex-direction:column; gap:4px; background:var(--bg-soft); border-radius:var(--radius-xs); padding:10px 12px; min-width:0;}
+  .rain-stat-row .rs-label{color:var(--muted); font-size:11.5px; font-weight:450;}
+  .rain-stat-row .rs-value{font-weight:600; font-size:15px; color:var(--ink); font-variant-numeric:tabular-nums; letter-spacing:-.025em;}
+  .rain-trend{display:inline-flex; align-items:center; gap:5px; font-weight:600;}
+  .rain-trend svg{width:13px;height:13px;}
+  .rain-trend.up{color:var(--water);}
+  .rain-trend.down{color:var(--green);}
+  .rain-trend.flat{color:var(--muted);}
+
+  .split{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  @media (max-width:1000px){ .split{grid-template-columns:1fr;} }
+
+  #map{height:300px;border-radius:var(--radius-sm);overflow:hidden;border:1px solid var(--line);filter:var(--map-filter);}
+
+  .console{
+    background:#131a17; color:#c6d4ca; border-radius:var(--radius-sm);
+    height:290px; overflow-y:auto; padding:12px 14px; font-family:var(--mono); font-size:11px;
+    display:flex; flex-direction:column-reverse;
+  }
+  .console .line{padding:3px 0; line-height:1.55;}
+  .console .line .ts{color:#6f7d74; margin-right:7px;}
+  .console .line.rx{color:#8fd4af;}
+  .console .line.relay{color:#dcb867;}
+  .console .line.cloud{color:#8bb4d8;}
+  .console .line.state{color:#c3b1e8;}
+  .console .line.sms{color:#e0897a; font-weight:600;}
+  .console .line.rain{color:#8bcde8;}
+
+  .cal-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;background:var(--amber-bg);color:var(--amber);padding:6px 12px;border-radius:999px;margin-top:10px;}
+
+  .weather-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px;}
+  .weather-stat{background:var(--bg-soft);border-radius:var(--radius-xs);padding:11px 13px;}
+  .weather-stat .ws-label{font-size:11.5px;color:var(--muted);font-weight:450;}
+  .weather-stat .ws-value{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:4px;letter-spacing:-.03em;}
+  .weather-loading,.weather-error{text-align:center;padding:28px 14px;color:var(--muted);font-size:12.5px;}
+
+  /* ---------- provenance ---------- */
+  .prov{display:grid; grid-template-columns:repeat(4,1fr); gap:24px;}
+  @media (max-width:980px){ .prov{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:600px){ .prov{grid-template-columns:1fr;} }
+  .prov-col h5{font-size:12.5px; font-weight:600; margin:0 0 8px; display:flex; align-items:center; gap:7px;}
+  .prov-col h5::before{content:""; width:7px; height:7px; border-radius:50%; background:var(--muted);}
+  .prov-col h5.ok::before{background:var(--accent);}
+  .prov-col h5.est-h::before{background:var(--water);}
+  .prov-col h5.warn-h::before{background:var(--amber);}
+  .prov-col h5.sim-h::before{background:var(--purple);}
+  .prov-col ul{margin:0; padding-left:16px; font-size:12.5px; color:var(--ink-soft); line-height:1.75;}
+  .prov-col .pv{color:var(--muted); font-size:11.5px;}
+  .prov-col p{font-size:11.5px; color:var(--muted); line-height:1.6; margin:9px 0 0;}
+
+  footer{margin-top:28px;padding-top:16px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted);}
+  .btn{background:var(--ink);color:var(--card);border:none;padding:8px 16px;border-radius:999px;font-weight:550;font-size:12.5px;cursor:pointer;font-family:inherit;}
+  .btn.ghost{background:transparent;border:1px solid var(--card-border);color:var(--ink-soft);}
+body[data-mode="live"] .controls-bar button:not(#live-btn),
+body[data-mode="live"] [data-toggle-fail],
+body[data-mode="live"] #cal-start-btn { display:none !important; }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-mark"><svg viewBox="0 0 24 24"><path d="M12 3.5c3.4 3.3 5.2 6 5.2 8.4a5.2 5.2 0 0 1-10.4 0c0-2.4 1.8-5.1 5.2-8.4Z"/><path d="M9.6 12.6a2.6 2.6 0 0 0 2.6 2.6"/></svg></div>
+    <b>FMS Center</b>
+  </div>
+
+  <nav class="sb-nav" id="sb-nav">
+    <a href="#overview"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10.5V20h12v-9.5"/></svg>Overview</a>
+    <a href="#prediction"><svg viewBox="0 0 24 24"><path d="M3 17l5.5-6 4 3.5L21 6"/><path d="M16 6h5v5"/></svg>Prediction</a>
+    <a href="#nodes"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 10h17M9 10v9"/></svg>Nodes</a>
+    <a href="#sensors"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>Sensors</a>
+    <a href="#rainfall"><svg viewBox="0 0 24 24"><path d="M17 14a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.6 1.7A4 4 0 0 0 7 16h10Z"/><path d="M9 19v1.5M12 19v2.5M15 19v1.5"/></svg>Rainfall</a>
+    <a href="#trends"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V5M16 20v-7M22 20H2"/></svg>Trends</a>
+    <a href="#activity"><svg viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 13 2.5-7h5"/></svg>Activity</a>
+    <a href="#weather"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.4M12 19.1v2.4M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.9 19.1l1.7-1.7M17.4 6.6l1.7-1.7"/></svg>Weather</a>
+    <a href="#diagnostics"><svg viewBox="0 0 24 24"><path d="M9.5 4.5 5 9l3 3 4.5-4.5a4 4 0 0 1 5.5-5.5l-3 3 2 2 3-3a4 4 0 0 1-5.5 5.5"/><path d="m10 14-6 6"/></svg>Diagnostics</a>
+    <a href="#calibration"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="17" r="2"/></svg>Calibration</a>
+    <a href="#reference"><svg viewBox="0 0 24 24"><path d="M5 4.5h10a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2Z"/><path d="M17 6.5h2v13H7"/></svg>Reference</a>
+  </nav>
+
+  <div class="sb-foot">
+    <a href="forecast.html"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.2 7-10.5a7 7 0 1 0-14 0C5 15.8 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.5"/></svg><span>Field forecast</span></a>
+    <button id="theme-toggle" title="Switch light / dark">
+      <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M2.5 12h2.6M18.9 12h2.6M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>
+      <span>Appearance</span>
+    </button>
+  </div>
+</aside>
+
+<main class="main">
+
+  <div class="page-head">
+    <h1>Field overview</h1>
+    <div class="head-right">
+      <div class="hpill" id="link-pill"><i></i><span>—</span></div>
+      <div class="hpill" id="mode-pill"><i></i><span id="mode-label">Simulated</span></div>
+      <div class="hpill"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></svg><span id="clock"></span></div>
+    </div>
+  </div>
+
+  <div class="toolbar controls-bar">
+    <div class="seg">
+      <button data-speed="0">Pause</button>
+      <button data-speed="1">1×</button>
+      <button data-speed="4">4×</button>
+      <button data-speed="15" class="active">15×</button>
+      <button data-speed="40">40×</button>
+    </div>
+    <span class="spacer"></span>
+    <button class="tbtn" id="live-btn">Live feed</button>
+    <button class="tbtn" id="run-demo">Run sequence</button>
+    <button class="tbtn" id="trigger-flood">Trigger flood</button>
+    <button class="tbtn" id="trigger-storm">Trigger storm</button>
+    <button class="tbtn" id="run-diagnostic">Run diagnostic</button>
+    <button class="tbtn" id="toggle-signal">Weak signal</button>
+  </div>
+
+  <section id="overview">
+    <div class="stat-grid" id="fleet-stats"></div>
+  </section>
+
+  <section id="prediction">
+    <div class="section-title"><h2>Flood prediction</h2></div>
+    <div class="predict-wrap">
+      <div class="panel predict-map-panel">
+        <h4>Field map</h4>
+        <div class="c-sub">Configured node locations; coordinates are provisioned until GNSS is verified.</div>
+        <div id="map"></div>
+        <div class="map-legend">
+          <span><i style="background:var(--accent)"></i>Normal</span>
+          <span><i style="background:var(--amber)"></i>Watching</span>
+          <span><i style="background:var(--red)"></i>Alerted</span>
+          <span><i style="background:var(--muted)"></i>Offline</span>
+          <span><i style="background:var(--purple)"></i>Rain gauge (planned)</span>
+        </div>
+      </div>
+      <div class="panel predict-panel">
+        <div class="predict-head">
+          <div>
+            <h4 id="predict-title">No node selected</h4>
+            <div class="c-sub" id="predict-sub">Pick a marker on the map, or a node below.</div>
+          </div>
+          <div class="node-chips" id="node-chips"></div>
+        </div>
+        <div id="predict-body">
+          <div class="predict-empty">Select a node to project its soil and water trend forward and cross-check it against the live regional forecast.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-title"><h2>Advisory</h2></div>
+    <div class="advisory" id="advisory">
+      <div class="adv-col"><div class="adv-sms" id="adv-sms">—</div></div>
+      <div class="adv-col"><div class="adv-tech" id="adv-tech">—</div></div>
+    </div>
+  </section>
+
+  <section id="nodes">
+    <div class="section-title"><h2>Nodes</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Node</th><th>Link</th><th>State</th><th>Battery</th><th>Soil</th><th>Water</th>
+          <th>Health</th><th>Risk</th><th>Last seen</th><th></th>
+        </tr></thead>
+        <tbody id="nodes-table"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="sensors">
+    <div class="section-title"><h2>Sensors</h2></div>
+    <div class="node-detail-grid" id="node-detail-grid"></div>
+  </section>
+
+  <section id="rainfall">
+    <div class="section-title"><h2>Rainfall</h2></div>
+    <div class="rain-card">
+      <div class="rain-head"><h3>Central rain gauge <span class="row-badge planned">planned</span></h3></div>
+      <div class="rain-body">
+        <div class="rain-headline">
+          <div class="rgd-value" id="rain-pct">—</div>
+          <div class="rgd-label">Intensity</div>
+        </div>
+        <div class="rain-stats">
+          <div class="rain-stat-row"><span class="rs-label">Raw ADC</span><span class="rs-value" id="rain-raw">—</span></div>
+          <div class="rain-stat-row"><span class="rs-label">State</span><span class="rs-value" id="rain-state">—</span></div>
+          <div class="rain-stat-row"><span class="rs-label">Trend</span><span class="rs-value" id="rain-trend">—</span></div>
+          <div class="rain-stat-row"><span class="rs-label">Last reading</span><span class="rs-value" id="rain-lastseen">—</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="trends">
+    <div class="section-title"><h2>Trends</h2></div>
+    <div class="chart-grid">
+      <div class="chart-card"><h4>Soil moisture</h4><div class="c-sub">Raw ADC — falls as soil wets</div><canvas id="chart-soil"></canvas></div>
+      <div class="chart-card"><h4>Water level</h4><div class="c-sub">Raw ADC — rises as water stands</div><canvas id="chart-water"></canvas></div>
+      <div class="chart-card"><h4>Soil health index</h4><div class="c-sub">0–100, derived from soil moisture</div><canvas id="chart-health"></canvas></div>
+      <div class="chart-card"><h4 id="risk-chart-title">Reported flood level</h4><div class="c-sub" id="risk-chart-sub">0 Normal · 1 Watch · 2 Warning · 3 Flood</div><canvas id="chart-risk"></canvas></div>
+      <div class="chart-card"><h4>Rate of change</h4><div class="c-sub">Percent of scale per minute</div><canvas id="chart-rate"></canvas></div>
+    </div>
+    <div class="chart-legend" id="chart-legend"></div>
+  </section>
+
+  <section id="activity">
+    <div class="section-title"><h2>Activity</h2></div>
+    <div class="split">
+      <div class="panel">
+        <h4>Events</h4>
+        <div class="c-sub">State changes, alerts and faults.</div>
+        <div class="table-wrap" style="border:none; padding:0; max-height:320px; overflow-y:auto;">
+          <table>
+            <thead><tr><th style="width:92px;">Time</th><th>Node</th><th>Event</th><th>Detail</th></tr></thead>
+            <tbody id="events-table"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <h4>Packet log</h4>
+        <div class="c-sub">Radio traffic as the base station receives it.</div>
+        <div class="console" id="console"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="weather">
+    <div class="section-title"><h2>Weather</h2></div>
+    <div class="panel">
+      <h4>Right now near the farm</h4>
+      <div class="c-sub">Live observation from Open-Meteo.</div>
+      <div id="weather-card"><div class="weather-loading">Fetching live weather…</div></div>
+    </div>
+  </section>
+
+  <section id="diagnostics">
+    <div class="section-title"><h2>Diagnostics</h2></div>
+    <div id="diagnostic-history"><div class="diag-empty">No diagnostic run yet.</div></div>
+  </section>
+
+  <section id="calibration">
+    <div class="section-title"><h2>Calibration</h2></div>
+    <div class="panel">
+      <table>
+        <thead><tr><th>Category</th><th>n</th><th>Mean (raw)</th><th>Min</th><th>Max</th></tr></thead>
+        <tbody>
+          <tr><td class="n">Dry</td><td>5</td><td>875.0</td><td>837</td><td>895</td></tr>
+          <tr><td class="n">Saturated</td><td>5</td><td>385.4</td><td>361</td><td>418</td></tr>
+          <tr id="cal-fc-row"><td class="n">Field capacity</td><td>0</td><td>—</td><td>—</td><td>—</td></tr>
+        </tbody>
+      </table>
+      <div class="cal-status" id="cal-status-note">Field-capacity leg incomplete — wetness, risk and reset thresholds are provisional.</div>
+
+      <div style="margin-top:20px; padding-top:18px; border-top:1px solid var(--line);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
+          <div>
+            <h4>Field-capacity run</h4>
+            <div class="c-sub" style="margin:0; max-width:560px;">Soak, drain 24–48h, then log 5 readings across 3 replicates. Readings here are simulated bench samples.</div>
+          </div>
+          <button class="btn" id="cal-start-btn">Start run</button>
+        </div>
+        <div id="cal-progress" hidden>
+          <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:9px;">
+            <span>Replicate <b id="cal-rep">1</b>/3 — reading <b id="cal-reading">0</b>/5</span>
+            <span id="cal-live-stats" style="color:var(--muted); font-variant-numeric:tabular-nums;"></span>
+          </div>
+          <div class="battery-bar" style="width:100%; height:6px; margin-bottom:14px;"><div class="battery-fill" id="cal-progress-bar" style="width:0%;"></div></div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn" id="cal-log-btn">Log reading</button>
+            <button class="btn ghost" id="cal-discard-btn">Discard run</button>
+            <button class="btn" id="cal-complete-btn" style="display:none; background:var(--green);">Write field capacity</button>
+          </div>
+          <div class="table-wrap" style="margin-top:14px; max-height:170px; overflow-y:auto;">
+            <table>
+              <thead><tr><th>#</th><th>Replicate</th><th>Raw ADC</th></tr></thead>
+              <tbody id="cal-log-table"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="reference">
+    <div class="section-title"><h2>Cost</h2></div>
+    <div class="stat-grid" id="economics-stats"></div>
+    <div style="font-size:11.5px; color:var(--muted); margin-top:10px; line-height:1.6; max-width:80ch;">$120/node is the project's cost ceiling, not a summed BOM — no priced parts list exists in the repo yet. $1,000 is a conservative floor for commercial flood telemetry, per the README's framing rather than quoted pricing.</div>
+
+    <div class="section-title"><h2>Data provenance</h2></div>
+    <div class="panel prov">
+      <div class="prov-col">
+        <h5 class="ok">Measured</h5>
+        <ul>
+          <li>Dry soil 875.0 <span class="pv">SD 23.0, n=5</span></li>
+          <li>Flooded soil 385.4 <span class="pv">SD 25.1, n=5</span></li>
+          <li>Soil bands = mean ±2SD</li>
+        </ul>
+        <p>31 Aug 2026, round 1 of 3. One soil type, one node.</p>
+      </div>
+      <div class="prov-col">
+        <h5 class="est-h">Estimated</h5>
+        <ul>
+          <li>Healthy band 552–699 <span class="pv">clay-loam literature</span></li>
+          <li>Buffers: water 30, rain 980</li>
+          <li>Idle readings <span class="pv">observed, not logged</span></li>
+        </ul>
+        <p>Never present these as test results.</p>
+      </div>
+      <div class="prov-col">
+        <h5 class="warn-h">Not yet tested</h5>
+        <ul>
+          <li>Soil field capacity</li>
+          <li>Fast-drop rate <span class="pv">needs a real wetting event</span></li>
+          <li>Rain intensity, water depth</li>
+        </ul>
+        <p>Rain and water are on/off only. Fast-drop is excluded from the warning level until calibrated.</p>
+      </div>
+      <div class="prov-col">
+        <h5 class="sim-h">Demo mode only</h5>
+        <ul>
+          <li>All node readings and scenarios</li>
+          <li>Battery, brownout, offline state</li>
+          <li>Rain gauge <span class="pv">no hardware exists</span></li>
+          <li>Cell signal, upload failures</li>
+        </ul>
+        <p>Flood prediction is dashboard-side. Base_code compares to a threshold and fires; it does not forecast.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div id="source-footer">Waiting for sensor readings.</div>
+    <button class="btn ghost" id="export-csv">Download raw data (CSV)</button>
+  </footer>
+
+</main>
+
+<script>
+/* =========================================================================
+   THEME
+   ========================================================================= */
+const THEME_KEY = "floodwatch-theme";
+function systemPrefersDark(){ return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches; }
+function applyThemeAttr(theme){ if (theme) document.documentElement.setAttribute("data-theme", theme); else document.documentElement.removeAttribute("data-theme"); }
+function effectiveTheme(){ return document.documentElement.getAttribute("data-theme") || (systemPrefersDark() ? "dark" : "light"); }
+(function initTheme(){ let saved=null; try{saved=localStorage.getItem(THEME_KEY);}catch(e){} applyThemeAttr(saved); })();
+
+/* =========================================================================
+   OFFLINE FALLBACKS
+
+   Chart.js and Leaflet come from CDNs. If they fail to load -- no internet,
+   blocked CDN, a field office on a hotspot -- every later `new Chart(...)`
+   throws and takes the whole script down with it, so the console shows
+   nothing at all rather than degrading. For a system whose whole premise is
+   working without internet, losing the numbers because a chart library is
+   missing is the wrong failure.
+
+   These stubs keep the same call surface. Charts and the map silently do
+   nothing; telemetry, prediction, advisory and alerts all still run.
+   ========================================================================= */
+const GRAPHICS_OK = (typeof Chart !== "undefined");
+const MAP_OK = (typeof L !== "undefined");
+
+// datasets is indexed by position (datasets[i].data = [...]), so an empty
+// array would throw on the first write. Hand back a stub for any index.
+function stubChart(){
+  const dsProxy = new Proxy([], {
+    get: (t, k) => (typeof k === "string" && /^\d+$/.test(k))
+      ? (t[k] || (t[k] = {data:[], borderColor:"", backgroundColor:""}))
+      : Reflect.get(t, k)
+  });
+  return { data:{labels:[], datasets:dsProxy},
+           options:{scales:{x:{}, y:{grid:{}}}, plugins:{}},
+           update(){}, destroy(){}, resize(){} };
+}
+if (!GRAPHICS_OK){
+  window.Chart = function(){ return stubChart(); };
+  window.Chart.defaults = {color:"", borderColor:"", font:{}};
+}
+if (!MAP_OK){
+  const chain = () => { const o = new Proxy({}, {get: () => chain}); return o; };
+  window.L = {
+    map: () => ({ setView(){return this;}, panTo(){}, removeLayer(){}, addLayer(){} }),
+    tileLayer: () => ({ addTo(){ return this; } }),
+    marker: () => ({ addTo(){return this;}, bindTooltip(){return this;},
+                     on(){return this;}, setIcon(){return this;} }),
+    polyline: () => ({ addTo(){return this;}, setStyle(){return this;} }),
+    divIcon: () => ({})
+  };
+}
+
+/* =========================================================================
+   CONFIG — copied from Base_code / Sensor_code / CALIBRATION.md
+   ========================================================================= */
+/* All values are 10-bit ADC counts (0–1023) as read on the transmitter node.
+   The three probes do not share a direction: water reads UP when wet, soil
+   and rain read DOWN when wet. Sensor Findings Brief, 2026-09-17. */
+
+// --- Measured: 5 readings per condition, 31 Aug 2026 (round 1 of 3) -------
+const SOIL_DRY_MEAN = 875.0, SOIL_DRY_SD = 23.0;    // min 837, max 895
+const SOIL_SAT_MEAN = 385.4, SOIL_SAT_SD = 25.1;    // min 361, max 418
+
+// --- Trigger thresholds: padded past the bench numbers for sensor noise ---
+const SOIL_FLOOD_THRESHOLD = 436;   // saturated  (SAT mean + 2SD)
+const SOIL_WATCH_THRESHOLD = 551;   // wetter than ideal, upper bound
+const SOIL_CLEAR_THRESHOLD = 470;   // hysteresis, so alerts don't flip
+const WATER_FLOOD_THRESHOLD = 30;   // ~3% of scale; idle reads 0
+const RAIN_THRESHOLD = 980;         // ~4% buffer; idle reads ~1023
+const SUSTAIN_COUNT = 3;            // consecutive readings before committing
+const RESET_COUNT = 3;
+
+// --- Soil zone edges. Only the two ends are measured; see SOIL_ZONES. -----
+const SOIL_FAULT_FLOOR = 960;       // at/above this the probe is out of soil
+const SOIL_CRIT_DRY_FLOOR = Math.round(SOIL_DRY_MEAN - 2*SOIL_DRY_SD);  // 829
+const SOIL_DRYING_CEIL = 828;
+const SOIL_CRIT_DRY_CEIL = 959;
+const SOIL_DRYING_FLOOR = 700;
+const SOIL_HEALTHY_FLOOR = 552;     // ESTIMATED — clay-loam literature
+const SOIL_HEALTHY_CEIL = 699;      // ESTIMATED — clay-loam literature
+
+// The brief calls a fast soil drop the strongest early flood signal but does
+// not set the rate — it needs a real wetting event logged first. This drives
+// a UI flag only; it is deliberately NOT an input to the warning level until
+// RAPID_DROP_CALIBRATED is true.
+const RAPID_DROP_PCT_PER_MIN = 4;
+const RAPID_DROP_CALIBRATED = false;
+
+const READ_INTERVAL_MS = 10000;
+const SMS_COOLDOWN_SIM_MS = 3600000;
+let lastSmsSimTime = 0;
+let CAL_FC = null;                  // set by the Field-Capacity wizard
+
+// Soil bands, wettest first. `est` marks a boundary that came from typical
+// clay-loam data rather than our own bench tests — the brief is explicit
+// that estimated values must never be shown as measured results.
+const SOIL_ZONES = [
+  {max:SOIL_FLOOD_THRESHOLD,   key:"saturated", short:"Saturated",  label:"Saturated",          health:"Roots flooding",     flood:"Flood risk", cls:"bad",  est:false},
+  {max:SOIL_WATCH_THRESHOLD,   key:"wet",       short:"Too wet",    label:"Wetter than ideal",  health:"Waterlogging risk",  flood:"Watch",      cls:"warn", est:true},
+  {max:SOIL_HEALTHY_CEIL,      key:"healthy",   short:"Healthy",    label:"Healthy",            health:"Good for crops",     flood:"No risk",    cls:"good", est:true},
+  {max:SOIL_DRYING_CEIL,        key:"drying",    short:"Drying",     label:"Drying out",         health:"Needs water soon",   flood:"No risk",    cls:"warn", est:false},
+  {max:SOIL_CRIT_DRY_CEIL,      key:"crit_dry",  short:"Very dry",   label:"Critically dry",     health:"Drought stress",     flood:"No risk",    cls:"bad",  est:false},
+  {max:Infinity,               key:"fault",     short:"Fault",      label:"Probe out of soil",  health:"Sensor fault",       flood:"Ignore",     cls:"bad",  est:false}
+];
+function soilZone(raw){ return SOIL_ZONES.find(z => raw <= z.max); }
+
+/* Normalisation from the brief — every feature reads 0 = dry, 1 = wet,
+   which is what lets three probes of differing polarity be compared. */
+const clamp01 = v => Math.max(0, Math.min(1, v));
+const waterWet = raw => clamp01(raw/1023);
+const soilWet  = raw => clamp01((SOIL_DRY_MEAN - raw)/(SOIL_DRY_MEAN - SOIL_SAT_MEAN));
+const rainWet  = raw => clamp01((1023 - raw)/1023);
+
+// Kept as a 0–100 display figure: 100 = saturated end of the measured range.
+function calculateSoilHealth(soil){
+  return Math.round(soilWet(soil)*100);
+}
+function provisionalWetnessPct(soil){
+  // The brief's scale is DRY(0) → SATURATED(100). Field capacity would give
+  // the agronomically correct zero point, but that test isn't done yet.
+  if (CAL_FC !== null){
+    return Math.max(0, Math.min(100, (CAL_FC - soil)/(CAL_FC - SOIL_SAT_MEAN)*100));
+  }
+  return soilWet(soil)*100;
+}
+function rainIntensityPct(raw){
+  // On/off only. The brief does not have light-vs-heavy calibration, so this
+  // is a display scale, not a measured intensity.
+  return Math.round(rainWet(raw)*100);
+}
+function riskScore(wetnessPct, water){
+  // Water is the brief's most direct flood signal, so it carries the larger
+  // weight once the probe is actually in contact. Display aggregate only.
+  const waterPct = waterWet(water)*100;
+  return Math.max(0, Math.min(100, wetnessPct*0.45 + waterPct*0.55));
+}
+
+/* =========================================================================
+   FIELD DEFINITIONS
+   ========================================================================= */
+const BASE_LOC = {lat:14.5333, lon:121.0000, name:"Base Station"};
+
+const nodes = [
+  { id:"1", name:"North Rice Paddy", type:"field", loc:{lat:14.5361, lon:120.9995},
+    soil:660, water:0, direct:true, scenario:"spike", scenarioTick:0,
+    history:[], state:"NORMAL", overCount:0, underCount:0, packets:0, lastSeen:Date.now(), smsCount:0,
+    battery:92, failed:false, failReason:null },
+  { id:"2", name:"East Canal Field", type:"field", loc:{lat:14.5352, lon:121.0044},
+    soil:780, water:0, direct:true, scenario:"flood", scenarioTick:0,
+    history:[], state:"NORMAL", overCount:0, underCount:0, packets:0, lastSeen:Date.now(), smsCount:0,
+    battery:78, failed:false, failReason:null },
+  { id:"3", name:"Riverside Plot", type:"field", loc:{lat:14.5288, lon:120.9978},
+    soil:690, water:0, direct:false, relayVia:"2", scenario:"drift", scenarioTick:0,
+    history:[], state:"NORMAL", overCount:0, underCount:0, packets:0, lastSeen:Date.now(), smsCount:0,
+    battery:55, failed:false, failReason:null }
+];
+
+// Battery/failure model — entirely simulated, see Known Simplifications.
+const BATTERY_DAY_MS = 8*60*1000;   // one simulated day/night cycle
+const BATTERY_LOW_PCT = 20;
+const BATTERY_BROWNOUT_PCT = 3;
+const BATTERY_RECOVER_PCT = 25;
+const OFFLINE_THRESHOLD_MS = 3 * READ_INTERVAL_MS;
+
+function updateBattery(node, silent){
+  const cyclePos = (simClock % BATTERY_DAY_MS) / BATTERY_DAY_MS;
+  const isDay = cyclePos < 0.55;
+  if (isDay) node.battery = Math.min(100, node.battery + 0.22);
+  else node.battery = Math.max(0, node.battery - 0.09);
+  node.battery = Math.max(0, node.battery - 0.015); // transmit overhead
+
+  if (!node.failed && node.battery <= BATTERY_BROWNOUT_PCT){
+    node.failed = true; node.failReason = "brownout";
+    if (!silent){
+      logLine(`Node ${node.id} brownout — battery critical (${node.battery.toFixed(0)}%), node going offline`, "sms");
+      pushEvent("failure", node.name, `Brownout at ${node.battery.toFixed(0)}% battery — matches HARDWARE.md's documented brownout symptom`);
+    }
+  } else if (node.failed && node.failReason === "brownout" && node.battery >= BATTERY_RECOVER_PCT){
+    node.failed = false; node.failReason = null; node.lastSeen = Date.now();
+    if (!silent){
+      logLine(`Node ${node.id} back online — battery recovered to ${node.battery.toFixed(0)}%`, "sms");
+      pushEvent("recovery", node.name, `Battery recharged to ${node.battery.toFixed(0)}%, resuming reports`);
+    }
+  }
+}
+function isOffline(node){
+  const limit = liveMode ? LIVE_OFFLINE_MS : OFFLINE_THRESHOLD_MS;
+  return node.failed || (Date.now()-node.lastSeen) > limit;
+}
+function toggleNodeFailure(id){
+  const node = nodes.find(n=>n.id===id);
+  if (node.failed){
+    node.failed = false; node.failReason = null; node.lastSeen = Date.now();
+    logLine(`Node ${id} manually restored`, "sms");
+    pushEvent("recovery", node.name, "Manually restored by technician");
+  } else {
+    node.failed = true; node.failReason = "manual";
+    logLine(`Node ${id} manually marked failed (simulated radio/hardware fault)`, "sms");
+    pushEvent("failure", node.name, "Manually simulated failure — radio or hardware fault, not a battery issue");
+  }
+  renderNodesTable(); renderFleetStats(); updateMap();
+}
+
+const rainNode = {
+  id:"R", name:"Central Rain Gauge", type:"rain", planned:true, loc:{lat:14.5333, lon:121.0010},
+  raw:1015, scenario:"storm", scenarioTick:0,
+  history:[], state:"NORMAL", overCount:0, underCount:0, packets:0, lastSeen:Date.now()
+};
+
+let suppressedCount = 0;
+let stateChangeCount = 0;
+let events = []; // {time, node, type, detail}
+const diagnosticHistory = [];
+
+const EVENTS_STORAGE_KEY = "devconsole-events-v1";
+function saveEvents(){
+  try { localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(events.slice(0,100).map(e=>({...e, time:e.time.toISOString()})))); } catch(e){}
+}
+function loadStoredEvents(){
+  try {
+    const raw = localStorage.getItem(EVENTS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || !parsed.length) return null;
+    return parsed.map(e=>({...e, time:new Date(e.time)}));
+  } catch(e){ return null; }
+}
+
+function pushEvent(type, node, detail){
+  events.unshift({time:new Date(), node, type, detail});
+  if (events.length > 300) events.pop();
+  saveEvents();
+}
+
+/* =========================================================================
+   SIMULATION ENGINE
+   ========================================================================= */
+let speedMult = 15;   // default: fast enough that a scenario moves on screen
+let simClock = 0;
+let nextRead = {1:0,2:0,3:3300,R:1800};
+let lastTickWall = performance.now();
+
+function noise(range){ return (Math.random()*2-1)*range; }
+
+/* Scenario ranges follow the Findings Brief's measured envelope:
+     soil   ~875 dry soil, ~385 flooded, >=960 means probe out of ground
+     water  idles at 0 and only leaves 0 on real contact
+     rain   idles ~1023 and falls when wet
+   The shapes are still invented — no real wetting event has been logged —
+   but the values a node can produce are now the ones the probes actually
+   produce, so thresholds mean the same thing here as on the bench. */
+const SOIL_FLOOR = Math.round(SOIL_SAT_MEAN - 2*SOIL_SAT_SD);   // 335
+const SOIL_CEIL  = 1023;
+
+function applyScenario(node){
+  node.scenarioTick = (node.scenarioTick||0) + 1;
+  const t = node.scenarioTick;
+  const settle = (cur, target, k, n) => cur + (target-cur)*k + noise(n);
+
+  if (node.scenario === "flood"){
+    // Full cascade: dry → rain wets the soil → soil saturates → standing
+    // water reaches the probe → drains back out.
+    let soilTarget, waterTarget;
+    if (t < 8)       { soilTarget = 780; waterTarget = 0; }
+    else if (t < 20) { soilTarget = 560; waterTarget = 0; }
+    else if (t < 30) { soilTarget = 420; waterTarget = 0; }
+    else if (t < 42) { soilTarget = 390; waterTarget = 180; }
+    else if (t < 58) { soilTarget = 470; waterTarget = 60; }
+    else             { soilTarget = 700; waterTarget = 0; if (t > 72) node.scenarioTick = 0; }
+    node.soil  = settle(node.soil,  soilTarget,  0.22, 7);
+    node.water = settle(node.water, waterTarget, 0.30, waterTarget > 0 ? 6 : 2);
+  } else if (node.scenario === "spike"){
+    // Short sharp downpour: soil dives, water touches, then it clears.
+    const c = t % 60;
+    const soilTarget  = c < 4 ? 400 : c < 10 ? 430 : 660;
+    const waterTarget = c < 4 ? 120 : c < 10 ? 45  : 0;
+    node.soil  = settle(node.soil,  soilTarget,  0.35, 7);
+    node.water = settle(node.water, waterTarget, 0.38, waterTarget > 0 ? 5 : 2);
+  } else if (node.scenario === "drift"){
+    // Slow waterlogging that hovers in the watch band without confirming.
+    const c = t % 55;
+    const soilTarget  = c < 24 ? 500 : 690;
+    const waterTarget = c < 24 ? 18  : 0;
+    node.soil  = settle(node.soil,  soilTarget,  0.14, 7);
+    node.water = settle(node.water, waterTarget, 0.16, 3);
+  }
+
+  if (node.scenario !== "storm"){
+    node.soil  = Math.max(SOIL_FLOOR, Math.min(SOIL_CEIL, Math.round(node.soil)));
+    // Water rests at exactly 0 when dry — the probe reads 0, not a floor value.
+    node.water = Math.max(0, Math.min(400, Math.round(node.water)));
+    if (node.water < 4) node.water = 0;
+  } else {
+    // Rain plate: idles ~1023, drops when wet, and stays wet a while after
+    // the rain stops (the brief notes this lag explicitly).
+    const c = t % 70;
+    const target = c < 12 ? 700 : c < 24 ? 820 : c < 38 ? 950 : 1015;
+    node.raw = settle(node.raw, target, 0.22, 8);
+    node.raw = Math.max(640, Math.min(1023, Math.round(node.raw)));
+  }
+}
+
+function stepFieldNode(node, silent){
+  updateBattery(node, silent);
+
+  if (node.failed){
+    // No radio contact while down — repeat the last known reading (flat
+    // line on the charts) instead of inventing new sensor data, and don't
+    // touch lastSeen/packets since nothing was actually transmitted.
+    const prev = node.history[node.history.length-1];
+    node.history.push(prev ? {...prev, t: simClock, rate:0, battery:node.battery} : {t:simClock, soil:node.soil, water:node.water, health:calculateSoilHealth(node.soil), pct:provisionalWetnessPct(node.soil), risk:0, rate:0, battery:node.battery});
+    if (node.history.length > 60) node.history.shift();
+    return;
+  }
+
+  applyScenario(node);
+  const health = calculateSoilHealth(node.soil);
+  const pct = provisionalWetnessPct(node.soil);
+  const risk = riskScore(pct, node.water);
+  // The brief measures ~5% wobble between consecutive soil readings and says
+  // to average 10-15 before using one. Differencing raw readings turns that
+  // wobble into tens of %/min of phantom rate, so rate is computed between
+  // two smoothed points instead.
+  const SMOOTH_N = 10;
+  const recent = node.history.slice(-SMOOTH_N);
+  const smoothNow = recent.length
+    ? (recent.reduce((s,h)=>s+h.pct, 0) + pct) / (recent.length + 1)
+    : pct;
+  const prevWindow = node.history.slice(-(SMOOTH_N*2), -SMOOTH_N);
+  const smoothPrev = prevWindow.length
+    ? prevWindow.reduce((s,h)=>s+h.pct, 0) / prevWindow.length
+    : null;
+  const dtMin = (READ_INTERVAL_MS/60000) * SMOOTH_N;
+  const rate = smoothPrev === null ? 0 : (smoothNow - smoothPrev)/dtMin;
+
+  node.history.push({t: simClock, soil: node.soil, water: node.water, health, pct, risk, rate, battery: node.battery});
+  predictDirty = true;
+  if (node.history.length > 60) node.history.shift();
+  if (!silent) node.packets++;
+  node.lastSeen = Date.now();
+
+  // Rate-of-rise flag — separate signal from the debounced alert state,
+  // matching moisture_alert_logic.ino's RATE_ALERT_PCT_PER_MIN concept:
+  // a fast-onset event can matter even before absolute saturation is hit.
+  // A fast soil drop is the brief's strongest early flood signal, but the
+  // rate that counts as "fast" has not been measured yet — it needs a real
+  // wetting event logged first. So the flag is tracked for display only and
+  // never raises an event; logging on an uncalibrated threshold is precisely
+  // the false-alert problem the padded triggers exist to avoid.
+  node.rapidFlagged = Math.abs(rate) >= RAPID_DROP_PCT_PER_MIN;
+  if (!silent && RAPID_DROP_CALIBRATED && node.rapidFlagged && !node.rapidLogged){
+    logLine(`RATE Node ${node.id} rapid ${rate>0?"rise":"fall"}: ${rate.toFixed(1)}%/min`, "state");
+    pushEvent("rapid", node.name, `${rate>0?"Rising":"Falling"} at ${Math.abs(rate).toFixed(1)}%/min`);
+  }
+  node.rapidLogged = node.rapidFlagged;
+
+  evaluateAlertState(node, silent);
+  if (!silent){ logPacket(node); logCloud(node, health); }
+}
+
+function stepRainNode(silent){
+  applyScenario(rainNode);
+  const pct = rainIntensityPct(rainNode.raw);
+  rainNode.history.push({t: simClock, raw: rainNode.raw, pct});
+  if (rainNode.history.length > 60) rainNode.history.shift();
+  if (!silent) rainNode.packets++;
+  rainNode.lastSeen = Date.now();
+
+  const prevState = rainNode.state;
+  rainNode.state = rainNode.raw < RAIN_THRESHOLD ? "WATCHING" : "NORMAL";
+  if (!silent && prevState !== rainNode.state){
+    logLine(`RAIN Central Rain Gauge state ${prevState} → ${rainNode.state} (placeholder threshold)`, "rain");
+    pushEvent("state", "Rain Gauge", `${prevState} → ${rainNode.state}`);
+  }
+}
+
+/* Four-level model, straight from the Findings Brief:
+
+     L0 Normal   rain >=980,  soil >=552,     water <=30
+     L1 Watch    rain <980 OR soil 437..551,  water <=30
+     L2 Warning  rain <980 AND (soil <=436 or dropping fast), water <=30
+     L3 Flood    water >30  — confirmed, regardless of the other two
+
+   The cascade behind it is rain -> soil falls -> standing water, so L2 is
+   the level that buys warning time; L3 is confirmation after the fact.
+   Fault handling is the brief's too: a soil reading at/above 960 means the
+   probe is out of the ground, so it is dropped from the decision rather
+   than read as "very dry". */
+function nodeRainRaw(node){
+  return liveMode ? (Number.isFinite(node.rain) ? node.rain : null) : rainNode.raw;
+}
+function assessLevel(node){
+  const soilFault = node.soil >= SOIL_FAULT_FLOOR;
+  const rawRain = nodeRainRaw(node);
+  const raining = rawRain !== null && rawRain < RAIN_THRESHOLD;
+  const waterContact = node.water > WATER_FLOOD_THRESHOLD;
+  const soilSaturated = !soilFault && node.soil <= SOIL_FLOOD_THRESHOLD;
+  const soilWet = !soilFault && node.soil <= SOIL_WATCH_THRESHOLD;
+  const droppingFast = !soilFault && node.rapidFlagged && RAPID_DROP_CALIBRATED;
+  if (liveMode && Number.isInteger(node.reportedRisk)) {
+    const level = node.reportedRisk;
+    const reasons = ["Gateway reports no crossed alert threshold", "Gateway reports watch-level conditions", "Gateway reports warning-level conditions", "Water probe above threshold — inspect the node and field"];
+    return {level, key:["NORMAL","WATCH","WARNING","FLOOD"][level], reason:reasons[level],
+            unsupported:level===3 && !raining && !soilWet, soilFault};
+  }
+
+  if (waterContact){
+    // Water with no supporting rain or soil signal is the brief's
+    // splash/fault case — still flag it, but say why it looks odd.
+    const unsupported = !raining && !soilWet;
+    return {level:3, key:"FLOOD", reason:"Water probe above 30 — flood confirmed at the node", unsupported, soilFault};
+  }
+  if (raining && (soilSaturated || droppingFast)){
+    return {level:2, key:"WARNING", reason: soilSaturated
+      ? "Raining and soil saturated — early flood warning"
+      : "Raining and soil dropping fast — early flood warning", soilFault};
+  }
+  if (raining || soilWet){
+    return {level:1, key:"WATCH", reason: raining
+      ? (soilWet ? "Raining, and soil wetter than ideal" : "Raining")
+      : "Soil wetter than ideal", soilFault};
+  }
+  return {level:0, key:"NORMAL", reason: soilFault ? "Soil probe out of ground — judging on rain and water only" : "All three probes normal", soilFault};
+}
+
+const LEVEL_STATE = {0:"NORMAL", 1:"WATCHING", 2:"WATCHING", 3:"ALERTED"};
+
+function evaluateAlertState(node, silent){
+  const a = assessLevel(node);
+  if (liveMode && Number.isInteger(node.reportedRisk)) {
+    node.level = a.level; node.levelReason = a.reason; node.state = LEVEL_STATE[a.level];
+    node.unsupportedWater = !!a.unsupported; node.soilFault = !!a.soilFault;
+    return; // Report the gateway's state; do not simulate a second SMS/alert pipeline.
+  }
+  node.level = a.level;
+  node.levelReason = a.reason;
+  node.unsupportedWater = !!a.unsupported;
+  node.soilFault = !!a.soilFault;
+
+  // Commit an alert only after SUSTAIN_COUNT consecutive readings (the
+  // brief asks for 3 in a row on both water and rain), and clear through
+  // the hysteresis band so the state can't chatter.
+  const triggered = a.level >= 2;
+  const cleared = a.level === 0 ||
+    (node.soil > SOIL_CLEAR_THRESHOLD && node.water <= WATER_FLOOD_THRESHOLD && a.level <= 1);
+  const prevState = node.state;
+
+  if (triggered){
+    node.overCount++;
+    if (node.overCount >= SUSTAIN_COUNT){
+      if (node.state !== "ALERTED"){ node.state = "ALERTED"; fireAlert(node, silent); }
+      node.underCount = 0;
+    } else if (node.state !== "ALERTED"){
+      node.state = "WATCHING";
+    }
+  } else {
+    node.overCount = 0;
+    if (node.state === "ALERTED"){
+      if (cleared){
+        node.underCount = (node.underCount||0) + 1;
+        if (node.underCount >= RESET_COUNT){ node.state = LEVEL_STATE[a.level]; node.underCount = 0; }
+      } else { node.underCount = 0; }
+    } else {
+      // Below the alert line the displayed state just tracks the level, so
+      // an L1 Watch never reads as "Safe" in the table.
+      node.state = LEVEL_STATE[a.level];
+    }
+  }
+  if (!silent && prevState !== node.state){
+    logLine(`ALERT Node ${node.id} state ${prevState} → ${node.state}`, "state");
+    stateChangeCount++;
+    pushEvent("state", node.name, `${prevState} → ${node.state}`);
+  }
+}
+
+function fireAlert(node, silent){
+  // The browser has no delivery receipt and must never claim an SMS was sent.
+  if (liveMode) return;
+  if (silent){ node.smsCount++; return; }
+  const onCooldown = lastSmsSimTime !== 0 && (simClock - lastSmsSimTime) < SMS_COOLDOWN_SIM_MS;
+  if (onCooldown){
+    const remainMin = Math.max(1, Math.ceil((SMS_COOLDOWN_SIM_MS - (simClock - lastSmsSimTime)) / 60000));
+    logLine(`Node ${node.id} crossed threshold — SMS suppressed, global cooldown ~${remainMin}m left`, "sms");
+    suppressedCount++;
+    pushEvent("suppressed", node.name, `Cooldown active, ~${remainMin}m remaining`);
+    return;
+  }
+  node.smsCount++;
+  lastSmsSimTime = simClock;
+  const lat = node.loc.lat.toFixed(4), lon = node.loc.lon.toFixed(4);
+  const msg = `FLOOD ALERT - Node ${node.id}!\nSoil: ${node.soil}\nWater: ${node.water}\nLoc: https://maps.google.com/?q=${lat},${lon}`;
+  logLine(`SMS sent — Node ${node.id} ALERTED`, "sms");
+  pushEvent("alert", node.name, msg.replace(/\n/g, " · "));
+}
+
+function logPacket(node){
+  const relay = !node.direct ? ` (relayed via Node ${node.relayVia})` : " (direct)";
+  logLine(`RX &lt;${node.id},${node.soil},${node.water}&gt; from Node ${node.id}${relay}`, !node.direct ? "relay" : "rx");
+}
+// Cellular signal — modeled on the base station's SIM7600/A7670 modem,
+// which exposes signal quality via the real AT+CSQ command (0-31 scale;
+// HARDWARE.md's own bring-up table lists "+CSQ: 99,99" as its no-signal
+// failure mode). This is base-station-wide, not per-field, since the
+// sensor nodes only talk HC-12 radio — only the base station has cellular.
+let cellularCSQ = 22;
+let signalDegraded = false;
+let cloudUploadAttempts = 0;
+let cloudUploadSuccesses = 0;
+
+function updateCellularSignal(){
+  if (signalDegraded){
+    cellularCSQ = Math.max(0, cellularCSQ - 2.5 + Math.random()*1.5);
+  } else {
+    cellularCSQ += (Math.random()*2-1)*2;
+    cellularCSQ = Math.max(8, Math.min(28, cellularCSQ));
+  }
+}
+function csqInfo(csq){
+  if (csq >= 20) return {label:"Good", cls:"good"};
+  if (csq >= 10) return {label:"Fair", cls:"warn"};
+  if (csq > 2) return {label:"Weak", cls:"warn"};
+  return {label:"No signal", cls:"bad"};
+}
+
+function logCloud(node, health){
+  const lat = node.loc.lat.toFixed(4), lon = node.loc.lon.toFixed(4);
+  updateCellularSignal();
+  cloudUploadAttempts++;
+  // The real firmware fires AT+HTTPACTION without checking the response —
+  // a failed upload here would be silent on-device, only visible as a gap
+  // in what the cloud actually received. That's exactly what this models.
+  const failChance = cellularCSQ<=2 ? 0.85 : cellularCSQ<=9 ? 0.35 : cellularCSQ<=15 ? 0.08 : 0.01;
+  if (Math.random() > failChance){
+    cloudUploadSuccesses++;
+    logLine(`→ cloud: field1=${node.soil}&field2=${node.water}&field3=${health}&lat=${lat}&long=${lon}`, "cloud");
+  } else {
+    logLine(`→ cloud: upload attempt failed — weak cellular signal (CSQ ${cellularCSQ.toFixed(0)}/31), no response to AT+HTTPACTION`, "cloud");
+  }
+}
+
+// Seed ~8 simulated minutes of history before the page goes live.
+// The clock has to advance as we go: every history entry carries a `t`, and
+// the flood projection fits its trend against those timestamps. Stepping 48
+// readings at a frozen simClock would stamp them all identically and hand the
+// regression a near-zero time delta — which yields absurd slopes.
+function warmupHistory(){
+  const WARMUP_STEPS = 48;
+  const startClock = simClock;
+  nodes.forEach(node=>{
+    simClock = startClock;
+    for (let i=0;i<WARMUP_STEPS;i++){
+      simClock += READ_INTERVAL_MS;
+      stepFieldNode(node, true);
+    }
+  });
+  simClock = startClock;
+  for (let i=0;i<WARMUP_STEPS;i++){
+    simClock += READ_INTERVAL_MS;
+    stepRainNode(true);
+  }
+  // Live reads resume from where the warmup left off.
+  nextRead = {1:simClock+READ_INTERVAL_MS, 2:simClock+READ_INTERVAL_MS, 3:simClock+READ_INTERVAL_MS+3300, R:simClock+READ_INTERVAL_MS+1800};
+}
+
+/* =========================================================================
+   RENDERING
+   ========================================================================= */
+const consoleEl = document.getElementById("console");
+function logLine(text, cls){
+  const div = document.createElement("div");
+  div.className = "line " + (cls||"");
+  const ts = new Date().toLocaleTimeString([], {hour12:false});
+  div.innerHTML = `<span class="ts">[${ts}]</span>${text}`;
+  consoleEl.prepend(div);
+  while (consoleEl.children.length > 200) consoleEl.removeChild(consoleEl.lastChild);
+}
+
+function statusMeta(state){
+  if (state==="ALERTED") return {cls:"alert", label:"Flood Risk"};
+  if (state==="WATCHING") return {cls:"watch", label:"Watch"};
+  return {cls:"", label:"Safe"};
+}
+
+/* A delta against the fleet's own recent history, not an invented trend:
+   the mean across reporting nodes of (latest reading - the reading
+   `back` steps earlier), as a percentage. Nodes without that much history
+   are skipped, and with none the tile simply shows no badge. */
+const DELTA_WINDOW = 12;
+/* A trend is only a trend if the two readings are close enough in time to be
+   comparable. Live history can span a gap of days -- a bench session in
+   October sitting next to one in November -- and twelve readings back then
+   lands on the far side of it. That produced "Battery +163%" from 8% two
+   weeks ago against 21% now: arithmetically right, meaningless as a trend. */
+const DELTA_MAX_SPAN_MS = 2 * 3600 * 1000;
+function fleetDelta(pick, back){
+  const src = (liveMode ? nodes.filter(n=>n.history.length) : nodes);
+  const ds = [];
+  src.forEach(n=>{
+    const h = n.history;
+    if (h.length < back+1) return;
+    const a = h[h.length-1], b = h[h.length-1-back];
+    if (a.t - b.t > DELTA_MAX_SPAN_MS) return;
+    const now = pick(a), then = pick(b);
+    if (!Number.isFinite(now) || !Number.isFinite(then) || then === 0) return;
+    ds.push((now-then)/Math.abs(then)*100);
+  });
+  return ds.length ? ds.reduce((x,y)=>x+y,0)/ds.length : null;
+}
+// `goodUp` says which direction is an improvement, so a falling battery reads
+// red and a falling flood risk reads green. Pass null where neither direction
+// is better -- raw soil moisture rising means drying, which is good for a
+// waterlogged field and bad for a dry one, so it gets no colour at all.
+function deltaBadge(pct, goodUp){
+  if (pct === null || Math.abs(pct) < 0.5) return "";
+  const cls = goodUp === null ? "" : (pct > 0) === goodUp ? "up" : "down";
+  return `<span class="st-delta ${cls}">${pct>0?"+":""}${pct.toFixed(0)}%</span>`;
+}
+
+function renderFleetStats(){
+  const offlineNodes = nodes.filter(isOffline);
+  const online = nodes.length - offlineNodes.length;
+  const alerted = nodes.filter(n=>!isOffline(n) && n.state==="ALERTED").length;
+  const watching = nodes.filter(n=>!isOffline(n) && n.state==="WATCHING").length;
+  // In live mode a node with no history has no reading to average; including
+  // its stale simulated value would blend real and invented data.
+  const reporting = liveMode ? nodes.filter(n=>n.history.length && !isOffline(n)) : nodes;
+  const avg = (fn)=> reporting.length
+    ? reporting.reduce((s,n)=>s+fn(n),0)/reporting.length : 0;
+  const last = n => n.history[n.history.length-1];
+  // A probe reading at or above the fault floor is not a dry field, it is a
+  // probe that is not in the ground. Averaging it in reports 0/100 "soil
+  // health" for hardware that measured nothing, so those nodes are excluded
+  // and the tile shows an em dash when none are left.
+  const soilValid = reporting.filter(n => n.soil < SOIL_FAULT_FLOOR);
+  const faulted = reporting.length - soilValid.length;
+  const avgOf = (arr, fn) => arr.length
+    ? (arr.reduce((s,n)=>s+fn(n),0)/arr.length).toFixed(0) : null;
+  const avgSoil = avgOf(soilValid, n=>n.soil);
+  const avgHealth = avgOf(soilValid, n=>{const l=last(n); return l?l.health:calculateSoilHealth(n.soil);});
+  const avgRisk = avg(n=>{const l=last(n); return l?l.risk:0;}).toFixed(0);
+  const reportedLevels = reporting.map(n=>n.reportedRisk).filter(Number.isInteger);
+  const reportedLevel = reportedLevels.length ? Math.max(...reportedLevels) : null;
+  const avgBattery = avgOf(reporting.filter(n=>Number.isFinite(n.battery)), n=>n.battery);
+  const lowBatteryCount = nodes.filter(n=>n.battery<=BATTERY_LOW_PCT).length;
+  const none = reporting.length === 0;
+
+  // The cellular link has no tile of its own any more; it lives in the page
+  // header, where the "Weak signal" control still has somewhere to show.
+  const linkEl = document.getElementById("link-pill");
+  if (linkEl && liveMode) {
+    linkEl.innerHTML = `<i style="background:${liveError ? 'var(--red)' : 'var(--muted)'}"></i><span>${liveError ? 'Feed unavailable' : 'Sensor feed · signal not reported'}</span>`;
+  } else if (linkEl){
+    const csq = csqInfo(cellularCSQ);
+    const completeness = cloudUploadAttempts ? (cloudUploadSuccesses/cloudUploadAttempts*100) : 100;
+    const tone = csq.cls === "bad" ? "var(--red)" : csq.cls === "warn" ? "var(--amber)" : "var(--green)";
+    linkEl.innerHTML = `<i style="background:${tone}"></i><span>CSQ ${cellularCSQ.toFixed(0)}/31 · `
+      + `${completeness.toFixed(0)}% uploaded</span>`;
+  }
+
+  const tiles = [
+    {label:"Nodes reporting", value:`${online}<small>/${nodes.length}</small>`,
+     cls: offlineNodes.length?"bad":""},
+    {label:"Active alerts", value:alerted, cls: alerted?"bad":"",
+     delta: watching ? `<span class="st-delta">${watching} watching</span>` : ""},
+    {label:"Soil health", value: (none||avgHealth===null)?"—":`${avgHealth}<small>/100</small>`,
+     delta: faulted ? `<span class="st-delta">${faulted} probe fault${faulted>1?"s":""}</span>`
+                    : deltaBadge(fleetDelta(h=>h.health, DELTA_WINDOW), true)},
+    liveMode ? {label:"Reported flood level", value:reportedLevel===null?"—":RISK_LEVEL_LABELS[reportedLevel],
+      cls:reportedLevel>=2?"bad":reportedLevel===1?"warn":""}
+    : {label:"Derived risk score", value:none?"—":`${avgRisk}<small>/100</small>`,
+       cls:avgRisk>=60?"bad":avgRisk>=35?"warn":"", delta:deltaBadge(fleetDelta(h=>h.risk, DELTA_WINDOW), false)},
+    {label:"Soil moisture", value: (none||avgSoil===null)?"—":`${avgSoil}<small> ADC</small>`,
+     delta: deltaBadge(fleetDelta(h=>h.soil, DELTA_WINDOW), null)},
+    {label:"Battery", value: (none || avgBattery === null)?"—":`${avgBattery}<small>%</small>`,
+     cls: lowBatteryCount?"warn":"",
+     delta: deltaBadge(fleetDelta(h=>h.battery, DELTA_WINDOW), true)},
+  ];
+  document.getElementById("fleet-stats").innerHTML = tiles.map(t=>`
+    <div class="stat-tile ${t.cls||''}">
+      <div class="st-top"><span class="st-label">${t.label}</span>${t.delta||""}</div>
+      <div class="st-value">${t.value}</div>
+    </div>`).join("");
+}
+
+function fmtAgo(secs){
+  if (secs < 90) return `${secs}s`;
+  if (secs < 5400) return `${Math.round(secs/60)}m`;
+  if (secs < 172800) return `${Math.round(secs/3600)}h`;
+  return `${Math.round(secs/86400)}d`;
+}
+
+function batteryCellHtml(node){
+  const pct = node.battery;
+  if (!Number.isFinite(pct)) return "—";
+  const cls = pct <= BATTERY_BROWNOUT_PCT*3 ? "bad" : pct <= BATTERY_LOW_PCT ? "warn" : "";
+  return `<div class="battery-cell">
+    <div class="battery-bar"><div class="battery-fill ${cls}" style="width:${pct.toFixed(0)}%"></div></div>
+    <span class="battery-pct">${pct.toFixed(0)}%</span>
+  </div>`;
+}
+
+function renderNodesTable(){
+  document.getElementById("nodes-table").innerHTML = nodes.map(n=>{
+    // With no history there is no reading. Falling back to n.soil/n.water
+    // would print the last simulated value as though a node had sent it.
+    const noData = liveMode && n.history.length === 0;
+    const last = n.history[n.history.length-1] || {soil:n.soil,water:n.water,health:calculateSoilHealth(n.soil),pct:provisionalWetnessPct(n.soil),risk:riskScore(provisionalWetnessPct(n.soil),n.water),rate:0};
+    const D = v => noData ? "—" : v;
+    const offline = isOffline(n);
+    const meta = offline ? {cls:"offline", label: n.failReason==="brownout" ? "Offline (battery)" : n.failed ? "Offline (fault)" : "Offline"} : statusMeta(n.state);
+    const secsAgo = Math.round((Date.now()-n.lastSeen)/1000);
+    const lastSeenStr = offline && n.failed
+      ? `down ${fmtAgo(secsAgo)}`
+      : `${fmtAgo(secsAgo)} ago`;
+    return `<tr style="${offline?'opacity:.6;':''}">
+      <td class="n">${n.name}</td>
+      <td>${n.direct ? "Direct" : `Via node ${n.relayVia}`}</td>
+      <td><span class="row-badge ${meta.cls}">${meta.label}</span>${!offline && !noData && n.soil >= SOIL_FAULT_FLOOR ? ` <span class="row-badge suppressed" title="Soil reads ≥${SOIL_FAULT_FLOOR} — the probe is not in the ground. Soil is excluded from the decision.">probe</span>` : ''}${n.rapidFlagged && !offline ? ' <span class="row-badge quiet" title="Soil moving fast. Rate threshold not yet calibrated, so this is an observation only.">fast</span>' : ''}</td>
+      <td>${noData?"—":batteryCellHtml(n)}</td>
+      <td class="n">${D(n.soil)}</td>
+      <td class="n">${D(n.water)}</td>
+      <td class="n">${noData || (liveMode && n.soil >= SOIL_FAULT_FLOOR) ? "—" : last.health}</td>
+      <td class="n">${noData?"—":liveMode?(RISK_LEVEL_LABELS[n.reportedRisk]??"—"):last.risk.toFixed(0)}</td>
+      <td>${noData?"never":lastSeenStr}</td>
+      <td style="text-align:right;"><button class="action-btn ${n.failed?'restore':'fail'}" data-toggle-fail="${n.id}">${n.failed ? "Restore" : "Fail"}</button></td>
+    </tr>`;
+  }).join("");
+  document.querySelectorAll("[data-toggle-fail]").forEach(btn=>{
+    btn.addEventListener("click", ()=> toggleNodeFailure(btn.dataset.toggleFail));
+  });
+}
+
+const RAIN_TREND_ICONS = {
+  up: '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 17 10 11 14 15 20 7"/><path d="M15 7h5v5"/></svg>',
+  down: '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7 10 13 14 9 20 17"/><path d="M15 17h5v-5"/></svg>',
+  flat: '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"><path d="M4 12h16"/></svg>'
+};
+function renderRainCard(){
+  if (liveMode && !rainNode.history.length) {
+    ["rain-raw", "rain-pct", "rain-state", "rain-lastseen"].forEach(id=>document.getElementById(id).textContent = "—");
+    document.getElementById("rain-trend").textContent = "Not deployed";
+    return;
+  }
+  const hist = rainNode.history;
+  const last = hist[hist.length-1] || {raw:rainNode.raw, pct:rainIntensityPct(rainNode.raw)};
+  const prev = hist[hist.length-2];
+  const pct = last.pct;
+
+  document.getElementById("rain-raw").textContent = rainNode.raw;
+  document.getElementById("rain-pct").textContent = pct.toFixed(0) + "%";
+  document.getElementById("rain-state").textContent = rainNode.state === "WATCHING" ? "Heavy" : "Normal";
+  document.getElementById("rain-lastseen").textContent = `${Math.round((Date.now()-rainNode.lastSeen)/1000)}s ago`;
+
+  const delta = prev ? pct - prev.pct : 0;
+  const dir = delta > 1.5 ? "up" : delta < -1.5 ? "down" : "flat";
+  const word = dir==="up" ? "Rising" : dir==="down" ? "Falling" : "Steady";
+  const trendEl = document.getElementById("rain-trend");
+  trendEl.innerHTML = `<span class="rain-trend ${dir}">${RAIN_TREND_ICONS[dir]}${word}</span>`;
+}
+
+function renderEventsTable(){
+  document.getElementById("events-table").innerHTML = events.slice(0,80).map(e=>{
+    const cls = e.type==="alert" ? "alert" : e.type==="suppressed" ? "suppressed" : e.type==="failure" ? "failure" : e.type==="rapid" ? "suppressed" : "state";
+    return `<tr>
+      <td>${e.time.toLocaleTimeString([], {hour12:false})}</td>
+      <td class="n">${e.node}</td>
+      <td><span class="row-badge ${cls}">${e.type}</span></td>
+      <td style="white-space:normal; font-family:var(--mono); font-size:11px;">${e.detail}</td>
+    </tr>`;
+  }).join("") || `<tr><td colspan="4" style="text-align:center; color:var(--muted); padding:24px;">No events yet.</td></tr>`;
+}
+
+/* ---- charts ---- */
+Chart.defaults.color = "#8c948e";
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.borderColor = "#eeefea";
+// A series palette, not a severity one: these three say "node 1/2/3", and
+// nothing in a chart line should read as an alert colour by accident.
+const nodeColors = {1:"#52ab85", 2:"#d08a4d", 3:"#5b8fc9"};
+const rainColor = "#7d6fc4";
+
+document.getElementById("chart-legend").innerHTML = nodes.map(n=>
+  `<div class="li"><i style="background:${nodeColors[n.id]}"></i>${n.name}</div>`
+).join("");
+
+function baseOpts(yOpts){
+  return {
+    responsive:true, animation:false, maintainAspectRatio:false,
+    interaction:{mode:"nearest", intersect:false},
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{display:false},
+      y: Object.assign({
+        border:{display:false},
+        grid:{color:"#eeefea", drawTicks:false, borderDash:[4,4]},
+        ticks:{maxTicksLimit:5, padding:8}
+      }, yOpts||{})
+    },
+    elements:{point:{radius:0, hoverRadius:3}, line:{tension:.35, borderWidth:2}}
+  };
+}
+function makeChart(id, extraYOpts){
+  if (!document.getElementById(id)) return stubChart();
+  return new Chart(document.getElementById(id), {
+    type:"line",
+    data:{labels:[], datasets:nodes.map(n=>({label:n.name, data:[], borderColor:nodeColors[n.id], backgroundColor:"transparent"}))},
+    options: baseOpts(extraYOpts)
+  });
+}
+const chartSoil = makeChart("chart-soil", {min:330,max:1023});
+const chartWater = makeChart("chart-water", {min:0,max:260});
+const chartHealth = makeChart("chart-health", {min:0,max:100});
+const chartRisk = makeChart("chart-risk", {min:0,max:100});
+const chartRate = makeChart("chart-rate", {});
+const chartRain = document.getElementById("chart-rain")
+  ? new Chart(document.getElementById("chart-rain"), {
+      type:"line",
+      data:{labels:[], datasets:[{label:"Central Rain Gauge", data:[], borderColor:rainColor, backgroundColor:"transparent"}]},
+      options: baseOpts({min:850,max:1023})
+    })
+  : stubChart();
+const chartBattery = makeChart("chart-battery", {min:0,max:100});
+
+function updateCharts(){
+  const longest = nodes.reduce((a,n)=>Math.max(a,n.history.length),0);
+  const labels = Array.from({length:longest},(_,i)=>i);
+  [chartSoil,chartWater,chartHealth,chartRisk,chartRate,chartBattery].forEach(c=>c.data.labels=labels);
+  nodes.forEach((n,idx)=>{
+    chartSoil.data.datasets[idx].data = n.history.map(h=>h.soil);
+    chartWater.data.datasets[idx].data = n.history.map(h=>h.water);
+    chartHealth.data.datasets[idx].data = n.history.map(h=>h.health);
+    chartRisk.data.datasets[idx].data = n.history.map(h=>liveMode ? h.reportedRisk : h.risk);
+    chartRate.data.datasets[idx].data = n.history.map(h=>h.rate);
+    chartBattery.data.datasets[idx].data = n.history.map(h=>h.battery);
+  });
+  chartRisk.options.scales.y.max = liveMode ? 3 : 100;
+  chartRisk.options.scales.y.ticks.stepSize = liveMode ? 1 : 20;
+  chartSoil.update(); chartWater.update(); chartHealth.update(); chartRisk.update(); chartRate.update(); chartBattery.update();
+
+  chartRain.data.labels = rainNode.history.map((_,i)=>i);
+  chartRain.data.datasets[0].data = rainNode.history.map(h=>h.raw);
+  chartRain.update();
+}
+function applyChartTheme(){
+  const cs = getComputedStyle(document.documentElement);
+  const muted = cs.getPropertyValue("--muted").trim();
+  const line = cs.getPropertyValue("--line").trim();
+  const bgSoft = cs.getPropertyValue("--bg-soft").trim();
+  Chart.defaults.color = muted;
+  Chart.defaults.borderColor = line;
+  [chartSoil,chartWater,chartHealth,chartRisk,chartRate,chartRain,chartBattery].forEach(c=>{
+    c.options.scales.y.grid.color = bgSoft;
+    c.update();
+  });
+  // Per-node minis and the projection chart are built later, so guard them.
+  Object.values(nodeCharts).forEach(pair=>{
+    [pair.soil, pair.water].forEach(c=>{
+      if (!c) return;
+      c.options.scales.y.grid.color = bgSoft;
+      c.data.datasets[1].borderColor = cs.getPropertyValue("--red").trim();
+      c.update();
+    });
+  });
+  if (predictChart){
+    predictChart.options.scales.y.grid.color = line;
+    predictChart.update();
+  }
+}
+
+/* ---- map ---- */
+let map, nodeMarkers = {}, linkLines = {}, rainMarker;
+function makeDivIcon(color, dashed, selected){
+  const ring = selected
+    ? `box-shadow:0 0 0 3px ${color}55, 0 1px 4px rgba(0,0,0,.35);`
+    : `box-shadow:0 1px 4px rgba(0,0,0,.35);`;
+  const size = selected ? 17 : 14;
+  return L.divIcon({
+    className:"", html:`<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px ${dashed?'dashed':'solid'} #fff;${ring}cursor:pointer;"></div>`,
+    iconSize:[size,size], iconAnchor:[size/2,size/2]
+  });
+}
+function initMap(){
+  map = L.map("map", {zoomControl:true, attributionControl:true}).setView([BASE_LOC.lat, BASE_LOC.lon], 13);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:17, attribution:"© OpenStreetMap"}).addTo(map);
+  L.marker([BASE_LOC.lat, BASE_LOC.lon], {icon: makeDivIcon("#1f5f96")}).addTo(map).bindTooltip("Base Station");
+  nodes.forEach(n=>{
+    const m = L.marker([n.loc.lat, n.loc.lon], {icon: makeDivIcon("#0f7a54")}).addTo(map)
+      .bindTooltip(`${n.name} — click to project`);
+    m.on("click", ()=>selectNode(n.id));
+    nodeMarkers[n.id] = m;
+    const line = L.polyline([[BASE_LOC.lat,BASE_LOC.lon],[n.loc.lat,n.loc.lon]], {color:"#0f7a54", weight:1.5, dashArray:"4,5", opacity:.5}).addTo(map);
+    linkLines[n.id] = line;
+  });
+  rainMarker = L.marker([rainNode.loc.lat, rainNode.loc.lon], {icon: makeDivIcon("#5b48a8", true)}).addTo(map).bindTooltip("Central Rain Gauge (planned)");
+}
+function nodeStateColor(n){
+  if (isOffline(n)) return "#76838f";
+  return n.state==="ALERTED" ? "#b3392c" : n.state==="WATCHING" ? "#9a6708" : "#0f7a54";
+}
+function updateMap(){
+  nodes.forEach(n=>{
+    const offline = isOffline(n);
+    const color = nodeStateColor(n);
+    nodeMarkers[n.id].setLatLng([n.loc.lat, n.loc.lon]);
+    linkLines[n.id].setLatLngs([[BASE_LOC.lat, BASE_LOC.lon], [n.loc.lat, n.loc.lon]]);
+    nodeMarkers[n.id].setIcon(makeDivIcon(color, offline, n.id===selectedNodeId));
+    linkLines[n.id].setStyle({color, opacity: offline ? .25 : n.state==="NORMAL" ? .4 : .8});
+  });
+}
+
+/* =========================================================================
+   FLOOD PREDICTION  —  dashboard-side model, NOT firmware behaviour.
+
+   Base_code does no forecasting whatsoever: it compares each reading to a
+   fixed threshold and fires. Everything below (trend fitting, time-to-
+   threshold, forecast cross-check) is projection this console computes for
+   the technician. It is listed in Known Simplifications for that reason.
+
+   Method: ordinary least squares over the most recent PREDICT_WINDOW
+   readings of each raw series, extrapolated linearly to its own alert
+   threshold. Linear is the honest choice here — with one soil probe and no
+   infiltration model there is nothing to justify a curve.
+   ========================================================================= */
+const PREDICT_WINDOW = 24;          // readings used for the fit
+const PREDICT_MIN_POINTS = 6;       // below this, refuse to project
+const PREDICT_HORIZON_MIN = 180;    // don't project further than 3h out
+let selectedNodeId = null;
+let predictChart = null;
+let predictDirty = true;   // set by each new reading; gates the panel rebuild
+
+// Ordinary least squares on {x,y}. Returns slope per x-unit plus r² so the
+// UI can down-rank a projection drawn through noise.
+function linFit(pts){
+  const n = pts.length;
+  if (n < 2) return {slope:0, intercept:pts[0]?.y ?? 0, r2:0};
+  let sx=0, sy=0, sxx=0, sxy=0;
+  for (const p of pts){ sx+=p.x; sy+=p.y; sxx+=p.x*p.x; sxy+=p.x*p.y; }
+  const denom = n*sxx - sx*sx;
+  if (denom === 0) return {slope:0, intercept:sy/n, r2:0};
+  const slope = (n*sxy - sx*sy)/denom;
+  const intercept = (sy - slope*sx)/n;
+  const mean = sy/n;
+  let ssTot=0, ssRes=0;
+  for (const p of pts){
+    ssTot += (p.y-mean)**2;
+    ssRes += (p.y - (slope*p.x+intercept))**2;
+  }
+  const r2 = ssTot === 0 ? 0 : Math.max(0, 1 - ssRes/ssTot);
+  return {slope, intercept, r2};
+}
+
+// Minutes until `series` reaches `threshold`, or null if it isn't heading there.
+function etaToThreshold(now, threshold, slopePerMs, rising){
+  if (rising ? slopePerMs <= 0 : slopePerMs >= 0) return null;   // moving away
+  if (rising ? now >= threshold : now <= threshold) return 0;     // already there
+  const ms = (threshold - now) / slopePerMs;
+  if (!isFinite(ms) || ms <= 0) return null;
+  return ms / 60000;
+}
+
+/* A step change in the series is not a trend, but a least-squares fit cannot
+   tell the difference — it reads the jump as a steep slope and keeps doing so
+   until the discontinuity leaves the window. Real causes: a node restored
+   after a failure, a scenario reset, a probe pulled and replaced. The brief
+   puts inter-reading wobble around 5% (~25 ADC), so anything past 80 ADC in
+   one interval is not soil moving; fit only what came after it. */
+const PREDICT_JUMP_ADC = 80;
+
+function trimAtDiscontinuity(hist){
+  for (let i=hist.length-1; i>0; i--){
+    if (Math.abs(hist[i].soil - hist[i-1].soil) > PREDICT_JUMP_ADC) return hist.slice(i);
+  }
+  return hist;
+}
+
+function predictNode(node){
+  const hist = trimAtDiscontinuity(node.history.slice(-PREDICT_WINDOW));
+  if (hist.length < PREDICT_MIN_POINTS){
+    return {ok:false, reason:`Only ${hist.length} reading${hist.length===1?"":"s"} since the last step change — need ${PREDICT_MIN_POINTS} before projecting.`};
+  }
+  const t0 = hist[0].t;
+  const soilFit  = linFit(hist.map(h=>({x:h.t-t0, y:h.soil})));
+  const waterFit = linFit(hist.map(h=>({x:h.t-t0, y:h.water})));
+  const last = hist[hist.length-1];
+
+  // Soil alerts on a FALLING raw value (wetter); water on a RISING one.
+  const soilEta  = etaToThreshold(last.soil,  SOIL_FLOOD_THRESHOLD,  soilFit.slope,  false);
+  const waterEta = etaToThreshold(last.water, WATER_FLOOD_THRESHOLD, waterFit.slope, true);
+
+  let driver=null, eta=null;
+  if (soilEta !== null && (waterEta === null || soilEta <= waterEta)){
+    driver="soil"; eta=soilEta;
+  } else if (waterEta !== null){
+    driver="water"; eta=waterEta;
+  }
+  if (eta !== null && eta > PREDICT_HORIZON_MIN){ eta=null; driver=null; }
+
+  // Confidence describes the fit we are actually reporting on. With no
+  // threshold crossing there is no driver series, so fall back to the
+  // better-fitting of the two — otherwise a perfectly clean recovery trend
+  // gets labelled "noisy" purely because no ETA was produced.
+  const r2 = driver === "soil"  ? soilFit.r2
+           : driver === "water" ? waterFit.r2
+           : Math.max(soilFit.r2, waterFit.r2);
+
+  return {
+    ok:true, node, hist, last, soilFit, waterFit, soilEta, waterEta, driver, eta, r2,
+    soilPerMin: soilFit.slope*60000,
+    waterPerMin: waterFit.slope*60000
+  };
+}
+
+/* =========================================================================
+   FLOOD FORECAST — the actual prediction, fusing node data with weather.
+
+   Three inputs, combined rather than displayed side by side:
+     1. the node's own smoothed soil/water velocity        (measured here)
+     2. the brief's cascade ordering
+          rain <980 -> soil <552 -> soil <=436 -> water >30
+     3. the live hourly rain forecast                      (Open-Meteo)
+
+   What the forecast contributes is PERSISTENCE, not magnitude. The brief
+   has no rain-intensity calibration and no mm-to-ADC transfer function, so
+   inventing one would be fabrication. Instead the measured wetting rate is
+   held while rain is falling or forecast, and decays once the forecast goes
+   dry -- which is the difference between "this field keeps wetting" and
+   "this shower is ending".
+
+   Each stage carries a basis so the UI never presents an assumption as a
+   measurement:
+     measured   - projected from this node's own trend
+     forecast   - depends on rain that has not fallen yet
+     unmeasured - the interval exists in the cascade but no logged event
+                  has ever timed it (saturation -> standing water)
+   ========================================================================= */
+
+// Named assumptions. Not measured; exposed so they can be replaced once a
+// real wetting event is logged.
+const FC_DRY_DECAY_TAU_MIN = 25;   // wetting rate decay once rain stops
+const FC_RAIN_WET_MM_H     = 0.2;  // hourly precip that counts as "wet"
+const FC_STEP_MIN          = READ_INTERVAL_MS/60000;
+const FC_HORIZON_MIN       = 360;
+
+// Turns the Open-Meteo hourly array into a forward wet/dry schedule.
+function rainSchedule(data){
+  if (!data?.hourly?.time) return null;
+  const times = data.hourly.time, prec = data.hourly.precipitation || [];
+  const nowIso = data.current?.time || new Date().toISOString().slice(0,13);
+  let idx = times.findIndex(t => t >= nowIso);
+  if (idx < 0) return null;
+  const hours = [];
+  for (let i=idx; i<times.length; i++) hours.push(prec[i] || 0);
+  if (!hours.length) return null;
+
+  const wetAt = min => (hours[Math.floor(min/60)] ?? 0) >= FC_RAIN_WET_MM_H;
+  const firstWet = hours.findIndex(mm => mm >= FC_RAIN_WET_MM_H);
+  let stops = null;
+  if (hours[0] >= FC_RAIN_WET_MM_H){
+    const d = hours.findIndex(mm => mm < FC_RAIN_WET_MM_H);
+    stops = d < 0 ? null : d*60;
+  }
+  return {
+    wetAt, hours,
+    startsInMin: firstWet < 0 ? null : firstWet*60,
+    stopsInMin: stops,
+    total: h => Math.round(hours.slice(0, h).reduce((a,b)=>a+b, 0)*10)/10
+  };
+}
+
+/* Forward simulation. Soil velocity is the node's own measured rate; the
+   schedule decides how long it survives. Water is only projected when it is
+   already moving -- the saturation-to-contact interval has never been timed,
+   so guessing it would be inventing the number the brief says is missing. */
+function floodForecast(node, p, data){
+  const sched = rainSchedule(data);
+  const rawRain = nodeRainRaw(node);
+  const rainingNow = rawRain !== null && rawRain < RAIN_THRESHOLD;
+  let soil = p.last.soil, water = p.last.water;
+  let vSoil = p.soilPerMin;            // ADC/min, negative = wetting
+  const vWater = p.waterPerMin;
+  /* "Wetting" has to clear the noise floor before anything is said about it.
+     The brief measures ~5% wobble between readings, which leaves a residual
+     drift of a couple of ADC/min after smoothing — enough to trip a -0.2
+     test on a field that is doing nothing. Require a real rate AND a fit
+     that supports it, or a flat node gets told to check its probe. */
+  const wetting = vSoil < -2 && p.r2 >= 0.3;
+
+  const path = [{t:0, soil, water}];
+  let satAt = null, contactAt = null;
+
+  for (let t=FC_STEP_MIN; t<=FC_HORIZON_MIN; t+=FC_STEP_MIN){
+    // Is the field being rained on at this point in the projection?
+    const wet = sched ? (t < 60 ? (rainingNow || sched.wetAt(t)) : sched.wetAt(t))
+                      : rainingNow;
+    if (wet && wetting){
+      vSoil = p.soilPerMin;                       // rate holds while it rains
+    } else {
+      vSoil *= Math.exp(-FC_STEP_MIN/FC_DRY_DECAY_TAU_MIN);   // shower ending
+    }
+    soil = Math.min(SOIL_CEIL, Math.max(SOIL_FLOOR, soil + vSoil*FC_STEP_MIN));
+    if (satAt === null && soil <= SOIL_FLOOD_THRESHOLD) satAt = t;
+
+    if (vWater > 0.2){                            // already rising: project it
+      water += vWater*FC_STEP_MIN;
+      if (contactAt === null && water > WATER_FLOOD_THRESHOLD) contactAt = t;
+    }
+    path.push({t, soil, water});
+    if (contactAt !== null) break;
+  }
+
+  // Stage timeline. Everything already true is "now"; everything ahead is
+  // labelled with what it actually rests on.
+  const stages = [];
+  const rainEta = rainingNow ? 0 : (sched ? sched.startsInMin : null);
+  stages.push({key:"rain", label:`Rain <${RAIN_THRESHOLD}`, eta:rainEta,
+               basis: rainingNow ? "measured" : "forecast"});
+  stages.push({key:"wet", label:`Soil <${SOIL_HEALTHY_FLOOR}`,
+               eta: p.last.soil < SOIL_HEALTHY_FLOOR ? 0 : null, basis:"measured"});
+  stages.push({key:"sat", label:`Soil ≤${SOIL_FLOOD_THRESHOLD}`,
+               eta: p.last.soil <= SOIL_FLOOD_THRESHOLD ? 0 : satAt,
+               basis: satAt !== null && !rainingNow && rainEta !== null ? "forecast" : "measured"});
+  stages.push({key:"flood", label:`Water >${WATER_FLOOD_THRESHOLD}`,
+               eta: p.last.water > WATER_FLOOD_THRESHOLD ? 0 : contactAt,
+               basis: contactAt !== null ? "measured" : "unmeasured"});
+
+  const floodEta = p.last.water > WATER_FLOOD_THRESHOLD ? 0 : contactAt;
+
+  // Confidence: trend fit, then penalties for leaning on a forecast, for a
+  // short history, and for the uncalibrated fast-drop gap.
+  const reasons = [];
+  let score = p.r2;
+  if (p.hist.length < PREDICT_WINDOW){ score *= 0.75; reasons.push("short history"); }
+  if (!rainingNow && rainEta !== null && satAt !== null){ score *= 0.6; reasons.push("depends on forecast rain"); }
+  if (satAt !== null && contactAt === null){ reasons.push("saturation→water interval never timed"); }
+  if (!sched){ score *= 0.8; reasons.push("no live forecast"); }
+  const label = score >= 0.7 ? "high" : score >= 0.4 ? "moderate" : "low";
+
+  return {
+    sched, rainingNow, stages, satAt, contactAt, floodEta, path,
+    confidence:{score, label, reasons},
+    fc:{h1: sched?sched.total(1):null, h3: sched?sched.total(3):null,
+        h6: sched?sched.total(6):null, h12: sched?sched.total(12):null},
+    agrees: sched ? ((sched.total(6) >= 2) === wetting) : null
+  };
+}
+
+// Rain in the NEXT `hours` hours from the Open-Meteo hourly array.
+function forecastRain(data, hours){
+  if (!data?.hourly?.time) return null;
+  const times = data.hourly.time, prec = data.hourly.precipitation || [];
+  const nowIso = (data.current?.time) || new Date().toISOString().slice(0,13);
+  let idx = times.findIndex(t => t >= nowIso);
+  if (idx < 0) idx = times.length-1;
+  let sum = 0;
+  for (let i=idx; i<Math.min(times.length, idx+hours); i++) sum += prec[i] || 0;
+  return Math.round(sum*10)/10;
+}
+
+function confidenceLabel(r2, n){
+  if (n < PREDICT_WINDOW/2) return {txt:"low", note:"short history"};
+  if (r2 >= 0.85) return {txt:"high", note:`r²=${r2.toFixed(2)}`};
+  if (r2 >= 0.5)  return {txt:"moderate", note:`r²=${r2.toFixed(2)}`};
+  return {txt:"low", note:`r²=${r2.toFixed(2)}, trend is noisy`};
+}
+
+function fmtEta(min){
+  if (min === null) return "—";
+  if (min <= 0) return "now";
+  if (min < 90) return `${Math.round(min)} min`;
+  return `${(min/60).toFixed(1)} h`;
+}
+
+function renderNodeChips(){
+  const el = document.getElementById("node-chips");
+  el.innerHTML = nodes.map(n=>`
+    <button class="node-chip ${n.id===selectedNodeId?'active':''}" data-node="${n.id}">
+      <i style="background:${nodeStateColor(n)}"></i>${n.name}
+    </button>`).join("");
+  el.querySelectorAll(".node-chip").forEach(b=>
+    b.addEventListener("click", ()=>selectNode(b.dataset.node)));
+}
+
+function selectNode(id){
+  selectedNodeId = id;
+  predictDirty = true;
+  renderNodeChips();
+  updateMap();
+  renderPrediction();
+  const n = nodes.find(x=>x.id===id);
+  if (n && map) map.panTo([n.loc.lat, n.loc.lon], {animate:true});
+}
+
+function renderPrediction(){
+  const body = document.getElementById("predict-body");
+  const title = document.getElementById("predict-title");
+  const sub = document.getElementById("predict-sub");
+  const node = nodes.find(n=>n.id===selectedNodeId);
+
+  if (!node){
+    title.textContent = "No node selected";
+    sub.textContent = "Pick a marker on the map, or a node below.";
+    body.innerHTML = `<div class="predict-empty">Select a node to project its soil and water trend forward and cross-check it against the live regional forecast.</div>`;
+    if (predictChart){ predictChart.destroy(); predictChart = null; }
+    renderAdvisory(null);
+    return;
+  }
+
+  title.textContent = node.name;
+  sub.innerHTML = `Node ${node.id} · ${node.loc.lat.toFixed(4)}°N, ${node.loc.lon.toFixed(4)}°E · ${isOffline(node) ? '<b style="color:var(--red)">offline</b>' : 'reporting'}`;
+
+  if (isOffline(node)){
+    body.innerHTML = `<div class="predict-empty">${node.name} is offline${node.failReason?` (${node.failReason})`:""}. No current readings to project from — the last values below are stale.</div>`;
+    if (predictChart){ predictChart.destroy(); predictChart = null; }
+    renderAdvisory(null, null, null, null, `${node.name} is offline. No advisory — the last reading is stale.`);
+    return;
+  }
+
+  const p = predictNode(node);
+  if (!p.ok){
+    body.innerHTML = `<div class="predict-empty">${p.reason}</div>`;
+    renderAdvisory(null, null, null, null, p.reason);
+    return;
+  }
+
+  const a = assessLevel(node);
+  const zone = soilZone(p.last.soil);
+  const f = floodForecast(node, p, demoWeather || (weatherCache ? weatherCache.data : null));
+  p.forecast = f;
+
+  const LEVEL_CLS = {0:"calm", 1:"watch", 2:"urgent", 3:"urgent"};
+  const LEVEL_NAME = {0:"Normal", 1:"Watch", 2:"Warning", 3:"Flood"};
+  let cls = LEVEL_CLS[a.level];
+  // A forecast crossing can raise urgency above the present-state level --
+  // that is the whole point of predicting rather than classifying.
+  if (a.level < 2 && f.satAt !== null && f.satAt <= 60) cls = "watch";
+
+  const headline = a.level === 3 ? "now"
+                 : f.floodEta !== null ? fmtEta(f.floodEta)
+                 : f.satAt !== null ? fmtEta(f.satAt)
+                 : "—";
+
+  let text = `<b>L${a.level} ${LEVEL_NAME[a.level]}</b> — ${a.reason}.`;
+  if (a.level < 3){
+    if (f.floodEta !== null){
+      text += ` Water on track to cross ${WATER_FLOOD_THRESHOLD} in ~${fmtEta(f.floodEta)}.`;
+    } else if (f.satAt !== null){
+      text += f.rainingNow
+        ? ` Saturation in ~${fmtEta(f.satAt)} if this rain holds.`
+        : ` Saturation in ~${fmtEta(f.satAt)}, but only if the forecast rain arrives.`;
+      text += ` Standing water follows — that interval has never been timed.`;
+    } else {
+      text += ` No saturation projected inside ${FC_HORIZON_MIN/60}h.`;
+    }
+  }
+  if (f.agrees === false){
+    text += f.fc.h6 >= 2
+      ? ` Forecast says ${f.fc.h6}mm/6h while the ground is steady — the trend cannot see that coming.`
+      : ` Ground is wetting with only ${f.fc.h6}mm forecast — check irrigation, drainage or the probe.`;
+  }
+  if (a.unsupported) text += ` Valid soil/rain readings do not corroborate the water alert — inspect for splash or a sensor fault.`;
+  if (a.soilFault) text += ` Soil probe reads ≥${SOIL_FAULT_FLOOR}; excluded from the decision.`;
+  text += ` Confidence <b>${f.confidence.label}</b>${f.confidence.reasons.length?` (${f.confidence.reasons.join("; ")})`:""}.`;
+
+  body.innerHTML = `
+    <div class="verdict ${cls}">
+      <div class="v-eta">${headline}</div>
+      <div class="v-text">${text}</div>
+    </div>
+    <div class="predict-metrics">
+      <div class="pm"><div class="k">Soil</div><div class="v">${p.last.soil}</div><div class="s">${p.soilPerMin>=0?"+":""}${p.soilPerMin.toFixed(1)}/min</div></div>
+      <div class="pm"><div class="k">Water</div><div class="v">${p.last.water}</div><div class="s">${p.waterPerMin>=0?"+":""}${p.waterPerMin.toFixed(1)}/min</div></div>
+      <div class="pm"><div class="k">Rain</div><div class="v">${nodeRainRaw(node)??"—"}</div></div>
+      <div class="pm"><div class="k">Saturation</div><div class="v">${fmtEta(f.satAt)}</div></div>
+      <div class="pm"><div class="k">Flood</div><div class="v">${fmtEta(f.floodEta)}</div></div>
+      <div class="pm"><div class="k">Zone</div><div class="v" style="font-size:10.5px;">${zone.short}${zone.est?' <span class="est">est.</span>':''}</div></div>
+      <div class="pm"><div class="k">Rain 6h${demoWeather?' <span class="est">demo</span>':''}</div><div class="v">${f.fc.h6===null?"—":f.fc.h6+"mm"}</div></div>
+    </div>
+    <div class="cascade">${f.stages.map(st=>{
+      const reached = st.eta === 0;
+      const pending = st.eta !== null && st.eta > 0;
+      return `<span class="cs ${reached?'on':pending?'due':''}">${st.label}${pending?` ${fmtEta(st.eta)}`:""}</span>`;
+    }).join("")}</div>
+    <div class="predict-chart-box"><canvas id="predict-chart"></canvas></div>`;
+
+  renderAdvisory(node, p, f, a);
+  drawPredictChart(p);
+}
+
+/* =========================================================================
+   ADVISORY LAYER — planned, simulated.
+
+   The gap this closes is real: Base_code currently texts "Soil: 455
+   Water: 75", which is a number dump a farmer cannot act on. The product
+   needs that turned into an instruction.
+
+   What is simulated here is ONLY the language generation — the sentences
+   below are templated, not written by a model. Every fact in them comes
+   from the live pipeline: the level from assessLevel(), the ETAs from
+   floodForecast(), the band from soilZone(), the rain from the forecast
+   feed. Swapping the templates for a real model call changes how these
+   read, not what they say.
+   ========================================================================= */
+function renderAdvisory(node, p, f, a, reason){
+  const sms = document.getElementById("adv-sms");
+  const tech = document.getElementById("adv-tech");
+  if (!sms) return;
+
+  if (!node || !p || !p.ok){
+    sms.textContent = "—"; sms.className = "adv-sms";
+    tech.textContent = reason || "Select a node.";
+    return;
+  }
+
+  const zone = soilZone(p.last.soil);
+  const field = node.name;
+  const lead = f.floodEta !== null ? f.floodEta : f.satAt;
+
+  // What the shipped firmware would send for this same reading.
+
+  let cls = "", body;
+  if (a.level >= 3){
+    cls = "bad";
+    body = `${field}: the water probe is above its alert threshold. Check the field and probe placement promptly. If standing water is confirmed, move vulnerable equipment and check drainage.`;
+  } else if (f.satAt !== null && f.satAt <= 90){
+    cls = "warn";
+    body = `${field}: ground is filling up. On current rain you have roughly ${fmtEta(f.satAt)} before it is saturated.`
+         + (f.rainingNow ? ` Rain is falling now.` : ` This depends on the rain arriving as forecast.`);
+  } else if (a.level >= 1){
+    cls = "warn";
+    body = `${field}: wetter than ideal but not filling fast. Nothing to do yet — worth a look if the rain keeps up.`;
+  } else if (zone.key === "drying" || zone.key === "crit_dry"){
+    body = `${field}: ${zone.key === "crit_dry" ? "very dry — this block needs water" : "drying out, water it in the next day or two"}.`
+         + (f.fc.h12 !== null && f.fc.h12 >= 5 ? ` ${f.fc.h12}mm of rain forecast in the next 12h — you may not need to.` : ``);
+  } else {
+    body = `${field}: soil is in good condition. Nothing needed.`;
+  }
+  sms.className = "adv-sms " + cls;
+  sms.textContent = body;
+
+  // The technician view keeps the numbers the farmer message deliberately drops.
+  const bits = [];
+  bits.push(`<b>L${a.level}</b> — ${a.reason}.`);
+  bits.push(`Soil <b>${p.last.soil}</b> (${zone.label}${zone.est?", est band":""}), water <b>${p.last.water}</b>, rain <b>${nodeRainRaw(node)??"unavailable"}</b>.`);
+  bits.push(`Trend <b>${p.soilPerMin>=0?"+":""}${p.soilPerMin.toFixed(1)}</b> ADC/min, fit r²=<b>${p.r2.toFixed(2)}</b>.`);
+  if (lead !== null) bits.push(`Projected <b>${fmtEta(lead)}</b> to ${f.floodEta!==null?"standing water":"saturation"}, confidence <b>${f.confidence.label}</b>.`);
+  if (f.agrees === false) bits.push(`<b>Forecast disagrees with the ground</b> — ${f.fc.h6}mm/6h expected. Check irrigation, drainage or the probe.`);
+  if (a.soilFault) bits.push(`<b>Soil probe ≥${SOIL_FAULT_FLOOR}</b> — likely out of the ground, excluded from the decision.`);
+  if (a.unsupported) bits.push(`<b>Water without rain or wet soil</b> — possible splash or fault.`);
+  tech.innerHTML = `<ul><li>${bits.join("</li><li>")}</li></ul>`;
+}
+
+function drawPredictChart(p){
+  const el = document.getElementById("predict-chart");
+  if (!el) return;
+  // Plot the soil series and the forecast's own simulated path, so the curve
+  // on screen is the thing the ETA came from — including where it bends as
+  // the forecast goes dry and the wetting rate decays.
+  const f = p.forecast;
+  const series = p.hist.map(h=>h.soil);
+  const threshold = SOIL_FLOOD_THRESHOLD;
+  const proj = f ? f.path.slice(1).map(pt=>pt.soil) : [];
+  const cap = Math.min(proj.length, 72);
+  const projCapped = proj.slice(0, cap);
+
+  const labels = [
+    ...p.hist.map((_,i)=>i-p.hist.length+1),
+    ...projCapped.map((_,i)=>i+1)
+  ];
+  const actual = [...series, ...Array(projCapped.length).fill(null)];
+  const projected = [...Array(series.length-1).fill(null), series[series.length-1], ...projCapped];
+  // Shade the stretch the forecast says is wet, so "why does it bend there"
+  // is answerable from the chart.
+  const rainBand = labels.map((l,i)=>{
+    if (l <= 0) return null;
+    const minsAhead = l*(READ_INTERVAL_MS/60000);
+    const wet = f && f.sched ? (minsAhead < 60 ? (f.rainingNow || f.sched.wetAt(minsAhead)) : f.sched.wetAt(minsAhead)) : f && f.rainingNow;
+    return wet ? threshold : null;
+  });
+
+  const cs = getComputedStyle(document.documentElement);
+  const accent = cs.getPropertyValue("--water").trim();
+  const red = cs.getPropertyValue("--red").trim();
+  const rainCol = cs.getPropertyValue("--purple").trim();
+
+  if (predictChart) predictChart.destroy();
+  predictChart = new Chart(el, {
+    type:"line",
+    data:{labels, datasets:[
+      {label:"Measured", data:actual, borderColor:accent, backgroundColor:"transparent", borderWidth:2, pointRadius:0},
+      {label:"Projected", data:projected, borderColor:accent, backgroundColor:"transparent", borderWidth:1.5, borderDash:[4,4], pointRadius:0},
+      {label:"Threshold", data:labels.map(()=>threshold), borderColor:red, backgroundColor:"transparent", borderWidth:1, borderDash:[2,3], pointRadius:0},
+      {label:"Rain forecast", data:rainBand, borderColor:rainCol, backgroundColor:"transparent", borderWidth:4, pointRadius:0, spanGaps:false}
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{legend:{display:true, labels:{boxWidth:10, boxHeight:2, font:{size:9.5}}}},
+      scales:{
+        x:{grid:{display:false}, ticks:{font:{size:9}, maxTicksLimit:8,
+           callback:(v,i)=>{ const l=labels[i]; return l===0?"now":(l>0?`+${l}`:`${l}`); }}},
+        y:{grid:{color:cs.getPropertyValue("--line").trim()}, ticks:{font:{size:9}}}
+      },
+      elements:{line:{tension:.25}}
+    }
+  });
+}
+
+/* ---- per-node sensor cards ---- */
+const nodeCharts = {};
+function buildNodeDetailCards(){
+  const grid = document.getElementById("node-detail-grid");
+  grid.innerHTML = nodes.map(n=>`
+    <div class="nd-card" data-node="${n.id}">
+      <div class="nd-head">
+        <div>
+          <div class="nd-name"><i style="background:${nodeColors[n.id]}"></i>${n.name}</div>
+          <div class="nd-sub" id="nd-sub-${n.id}">—</div>
+        </div>
+        <div class="nd-health" id="nd-health-${n.id}">
+          <div class="h-val">—</div>
+          <div class="h-lab" id="nd-zone-${n.id}">—</div>
+        </div>
+      </div>
+      <div class="nd-charts">
+        <div class="nd-chart">
+          <h5>Soil</h5>          <div class="nd-chart-box"><canvas id="nd-soil-${n.id}"></canvas></div>
+        </div>
+        <div class="nd-chart">
+          <h5>Water</h5>          <div class="nd-chart-box"><canvas id="nd-water-${n.id}"></canvas></div>
+        </div>
+      </div>
+    </div>`).join("");
+
+  nodes.forEach(n=>{
+    nodeCharts[n.id] = {
+      soil: makeMiniChart(`nd-soil-${n.id}`, nodeColors[n.id], SOIL_FLOOD_THRESHOLD, {min:330,max:1023}),
+      water: makeMiniChart(`nd-water-${n.id}`, nodeColors[n.id], WATER_FLOOD_THRESHOLD, {min:0,max:260})
+    };
+  });
+  grid.querySelectorAll(".nd-card").forEach(c=>{
+    c.addEventListener("click", ()=>selectNode(c.dataset.node));
+  });
+}
+
+function makeMiniChart(id, color, threshold, yOpts){
+  const cs = getComputedStyle(document.documentElement);
+  return new Chart(document.getElementById(id), {
+    type:"line",
+    data:{labels:[], datasets:[
+      {data:[], borderColor:color, backgroundColor:"transparent", borderWidth:1.8, pointRadius:0},
+      {data:[], borderColor:cs.getPropertyValue("--red").trim(), borderWidth:1, borderDash:[2,3], pointRadius:0}
+    ]},
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{legend:{display:false}, tooltip:{enabled:false}},
+      scales:{x:{display:false}, y:Object.assign({grid:{color:cs.getPropertyValue("--line").trim()}, ticks:{font:{size:8.5}, maxTicksLimit:3}}, yOpts)},
+      elements:{line:{tension:.3}},
+      _threshold: threshold
+    }
+  });
+}
+
+// Band follows the soil zone table, not an arbitrary cut on the index.
+function healthBand(soilRaw){ return soilZone(soilRaw).cls === "good" ? "good" : soilZone(soilRaw).cls === "warn" ? "mid" : "bad"; }
+
+function updateNodeDetail(){
+  nodes.forEach(n=>{
+    const last = n.history[n.history.length-1];
+    if (!last) return;
+    const offline = isOffline(n);
+    const band = healthBand(last.soil);
+
+    const zone = soilZone(last.soil);
+    const hEl = document.getElementById(`nd-health-${n.id}`);
+    hEl.className = `nd-health ${band}`;
+    hEl.querySelector(".h-val").textContent = offline || (liveMode && last.soil >= SOIL_FAULT_FLOOR) ? "—" : last.health;
+    document.getElementById(`nd-zone-${n.id}`).innerHTML =
+      offline ? "offline" : `${zone.label}${zone.est ? ' <span class="est">est.</span>' : ''}`;
+
+    document.getElementById(`nd-sub-${n.id}`).textContent =
+      offline ? `offline · ${n.failReason || "no packets"}` : `soil ${last.soil} · water ${last.water}`;
+
+    const c = nodeCharts[n.id];
+    if (!c) return;
+    const labels = n.history.map((_,i)=>i);
+    c.soil.data.labels = labels;
+    c.soil.data.datasets[0].data = n.history.map(h=>h.soil);
+    c.soil.data.datasets[1].data = labels.map(()=>SOIL_FLOOD_THRESHOLD);
+    c.soil.update();
+    c.water.data.labels = labels;
+    c.water.data.datasets[0].data = n.history.map(h=>h.water);
+    c.water.data.datasets[1].data = labels.map(()=>WATER_FLOOD_THRESHOLD);
+    c.water.update();
+  });
+}
+
+/* =========================================================================
+   WEATHER CHECK (live, Open-Meteo)
+   ========================================================================= */
+const WMO_DESC = {0:"Clear sky",1:"Mainly clear",2:"Partly cloudy",3:"Overcast",45:"Fog",48:"Rime fog",
+  51:"Light drizzle",53:"Moderate drizzle",55:"Dense drizzle",61:"Slight rain",63:"Moderate rain",65:"Heavy rain",
+  80:"Slight showers",81:"Moderate showers",82:"Violent showers",95:"Thunderstorm",96:"Thunderstorm, hail",99:"Thunderstorm, heavy hail"};
+function weatherDesc(code){ return WMO_DESC[code] ?? "Unknown conditions"; }
+function sumRecentRain(data, hours){
+  const times=data.hourly.time, precs=data.hourly.precipitation;
+  let idx = times.findIndex(t=>t>data.current.time);
+  if (idx===-1) idx = times.length;
+  idx -= 1;
+  if (idx<0) return 0;
+  const start = Math.max(0, idx-hours+1);
+  let sum=0; for (let i=start;i<=idx;i++){ sum += precs[i]||0; }
+  return Math.round(sum*10)/10;
+}
+let weatherCache = null;
+async function fetchWeather(){
+  try{
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${BASE_LOC.lat}&longitude=${BASE_LOC.lon}`+
+      `&current=temperature_2m,precipitation,rain,weather_code,relative_humidity_2m&hourly=precipitation&past_hours=24&forecast_hours=12&timezone=Asia%2FManila`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("HTTP "+res.status);
+    const data = await res.json();
+    weatherCache = {data, fetchedAt: Date.now()};
+    const c = data.current;
+    const rain6h = sumRecentRain(data,6), rain24h = sumRecentRain(data,24);
+    document.getElementById("weather-card").innerHTML = `
+      <div style="font-size:12.5px; color:var(--ink-soft);">${weatherDesc(c.weather_code)} · ${BASE_LOC.lat.toFixed(2)}°N, ${BASE_LOC.lon.toFixed(2)}°E</div>
+      <div class="weather-stats">
+        <div class="weather-stat"><div class="ws-label">Temp</div><div class="ws-value">${c.temperature_2m.toFixed(0)}°C</div></div>
+        <div class="weather-stat"><div class="ws-label">Humidity</div><div class="ws-value">${c.relative_humidity_2m}%</div></div>
+        <div class="weather-stat"><div class="ws-label">Rain now</div><div class="ws-value">${(c.precipitation??0).toFixed(1)}mm/h</div></div>
+        <div class="weather-stat"><div class="ws-label">6h total</div><div class="ws-value">${rain6h}mm</div></div>
+        <div class="weather-stat"><div class="ws-label">24h total</div><div class="ws-value">${rain24h}mm</div></div>
+      </div>
+      <div style="font-size:10.5px; color:var(--muted); margin-top:8px;">${liveMode ? "Regional weather estimate; the planned central rain gauge has no readings." : `Simulated rain gauge intensity: ${rainIntensityPct(rainNode.raw).toFixed(0)}% on a placeholder scale.`}</div>
+    `;
+  } catch(e){
+    document.getElementById("weather-card").innerHTML = `<div class="weather-error">Couldn't reach api.open-meteo.com. <button class="btn ghost" id="weather-retry" style="margin-top:6px;">Retry</button></div>`;
+    document.getElementById("weather-retry").addEventListener("click", fetchWeather);
+  }
+}
+
+/* =========================================================================
+   MAIN LOOP
+   ========================================================================= */
+/* =========================================================================
+   LIVE FEED — real readings from the ingest server.
+
+   The server receives the identical query string whether it arrived over
+   USB serial or over cellular, so this code does not know or care which
+   transport produced a reading. Switching the base station from the serial
+   bridge to THINGSPEAK_ENABLED 1 changes nothing here.
+
+   Live mode stops the simulator entirely rather than blending the two: a
+   chart mixing invented and measured readings would be worse than either.
+   ========================================================================= */
+/* Where the readings come from. Three cases, in order:
+     ?feed=<url>        explicit override, for pointing a local page at a
+                        deployed server (or the reverse) without an edit
+     served from a host  assume the ingest server sits behind the same origin
+                        at /feed -- that is how it is deployed
+     served locally      fms_server.py on :8080 beside the page, the dev setup
+   Hardcoding localhost made the page work only on the machine running the
+   server, which is the one place a field dashboard is least useful. */
+const FEED_URL = (() => {
+  const q = new URLSearchParams(location.search).get("feed");
+  if (q) return q.replace(/\/+$/, "");
+  if (location.protocol.startsWith("http")) return location.origin + "/feed";
+  return "http://localhost:8080/feed";
+})();
+const FEED_POLL_MS = 4000;
+/* The simulator reads every 10s, so 30s of silence means something is wrong.
+   A cellular node cannot be held to that: TS_MIN_INTERVAL_MS alone spaces
+   uploads 20s apart, and a retry or a weak-signal window stretches it
+   further. 10 minutes matches NODE_OFFLINE_MS in Base_Code.ino, so the
+   dashboard and the base station agree on what "offline" means. */
+const RISK_LEVEL_LABELS = ["Normal", "Watch", "Warning", "Flood"];
+const LIVE_OFFLINE_MS = 600000;
+let liveMode = false, liveLastId = 0, liveSeen = 0, liveError = null;
+
+function setLiveBanner(){
+  let el = document.getElementById("live-banner");
+  if (!liveMode){ if (el) el.remove(); return; }
+  if (!el){
+    el = document.createElement("div");
+    el.id = "live-banner"; el.className = "demo-banner";
+    el.style.background = "var(--green-bg)"; el.style.borderColor = "var(--green)";
+    document.querySelector(".controls-bar").insertAdjacentElement("afterend", el);
+  }
+  // "26 readings received" is true of a feed that went quiet days ago, so
+  // the age of the newest reading goes next to it. That is the number that
+  // answers "is this actually live?".
+  let newest = 0;
+  nodes.forEach(n=>{ if (n.lastSeen > newest) newest = n.lastSeen; });
+  const age = newest ? fmtAgo(Math.round((Date.now()-newest)/1000)) : null;
+  const state = liveError ? `<b style="color:var(--red)">${liveError}</b>`
+    : `${liveSeen} reading${liveSeen===1?"":"s"} received`
+      + (age ? ` &middot; newest ${age} ago` : ` &middot; none yet`);
+  el.innerHTML = `<span class="db-step" style="color:var(--green)">LIVE</span>
+    <span class="db-text">Real readings from the base station — simulator stopped. ${state}</span>
+    <button class="db-stop" id="live-stop" style="border-color:var(--green); color:var(--green)">Open simulated demo</button>`;
+  document.getElementById("live-stop").addEventListener("click", ()=>setLive(false));
+}
+
+// Server rows -> the same history shape stepFieldNode() produces, so every
+// consumer (prediction, advisory, charts, map) works untouched.
+function ingestRows(rows){
+  let added = 0;
+  rows.slice().sort((a,b)=>a.id-b.id).forEach(r=>{
+    if (r.id <= liveLastId) return;
+    liveLastId = r.id;
+    const node = nodes.find(n=>n.id === String(r.node));
+    if (!node) return;
+    // A delayed upload must not roll the latest field state backwards.
+    if (node.lastSeen && r.ts < node.lastSeen) return;
+    const soil = r.soil, water = r.water;
+    if (soil === null || water === null) return;
+    const health = calculateSoilHealth(soil);
+    const pct = provisionalWetnessPct(soil);
+    const prev = node.history[node.history.length-1];
+    // Rate over the gap these two readings actually have, not over the
+    // simulator's fixed 10s. Cellular uploads are irregular -- 20s minimum,
+    // longer after a retry -- so assuming a constant interval inflates or
+    // deflates every rate, and the rate is what the prediction is built on.
+    const dtMin = prev ? (r.ts - prev.t) / 60000 : 0;
+    const rate = (prev && dtMin > 0) ? (pct - prev.pct) / dtMin : 0;
+    node.soil = soil; node.water = water;
+    node.rain = Number.isFinite(r.rain) ? r.rain : null;
+    node.reportedRisk = Number.isInteger(r.risk) && r.risk>=0 && r.risk<=3 ? r.risk : null;
+    node.battery = Number.isFinite(r.batt_pct) ? r.batt_pct : null;
+    if (Number.isFinite(r.lat) && Number.isFinite(r.lon)) node.loc = {lat:r.lat, lon:r.lon};
+    node.history.push({t: r.ts, soil, water, health, pct,
+                       risk: riskScore(pct, water), reportedRisk:node.reportedRisk, rate, battery: node.battery});
+    if (node.history.length > 60) node.history.shift();
+    node.packets++; node.failed = false;
+    // When the server received it, never when we read it off the feed.
+    // Stamping Date.now() here made a three-day-old reading display as
+    // "0s ago" and kept a dead node permanently online.
+    node.lastSeen = r.ts;
+    evaluateAlertState(node, r.ts < Date.now() - FEED_POLL_MS * 2);
+    predictDirty = true;
+    added++;
+  });
+  return added;
+}
+
+async function pollFeed(){
+  if (!liveMode) return;
+  try{
+    const res = await fetch(`${FEED_URL}?limit=100`, {cache:"no-store"});
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const rows = await res.json();
+    liveError = null;
+    const n = ingestRows(rows);
+    if (n){
+      liveSeen += n;
+      renderFleetStats(); renderNodesTable(); renderEventsTable();
+      updateCharts(); updateMap(); updateNodeDetail();
+      renderNodeChips(); renderPrediction();
+    }
+  } catch(e){
+    liveError = "Feed unavailable — showing the last received readings with their original timestamps";
+  }
+  // Freshness keeps updating even when the server has no new rows.
+  renderFleetStats(); renderNodesTable(); renderRainCard();
+  updateNodeDetail(); renderNodeChips(); renderPrediction(); updateMap();
+  setLiveBanner();
+}
+
+// The header pill is the one place that always says which source the page is
+// showing, so it must never be left reading "Simulated" over live data.
+function setModePill(live){
+  const pill = document.getElementById("mode-pill");
+  const label = document.getElementById("mode-label");
+  if (!pill || !label) return;
+  pill.classList.toggle("live", !!live);
+  label.textContent = live ? "Live feed" : "Simulated";
+  document.body.dataset.mode = live ? "live" : "demo";
+  document.getElementById("risk-chart-title").textContent = live ? "Reported flood level" : "Derived risk score";
+  document.getElementById("risk-chart-sub").textContent = live ? "0 Normal · 1 Watch · 2 Warning · 3 Flood" : "Uncalibrated composite of wetness and water level";
+  document.getElementById("source-footer").textContent = live
+    ? "Sensor readings from the server. Signal strength and SMS delivery are not reported."
+    : "Simulated telemetry — generated for demonstration.";
+}
+
+function setLive(on){
+  liveMode = on;
+  const btn = document.getElementById("live-btn");
+  if (on){
+    setSpeed(0);                       // stop the simulator; do not blend sources
+    // Clearing history is not enough: soil/water/battery keep their last
+    // simulated values and would still render. lastSeen = 0 forces every node
+    // to read OFFLINE until a real packet arrives for it, so a node that is
+    // not reporting cannot show an invented reading.
+    nodes.forEach(n=>{ n.history = []; n.packets = 0; n.state = "NORMAL";
+                       n.overCount = 0; n.underCount = 0;
+                       n.lastSeen = 0; n.failed = false; n.smsCount = 0; });
+    // The rain gauge has no hardware at all, so in live mode it has nothing
+    // to show rather than a simulated trace.
+    rainNode.history = []; rainNode.packets = 0; rainNode.lastSeen = 0;
+    liveLastId = 0; liveSeen = 0; liveError = null;
+    if (btn){ btn.textContent = "Open simulated demo"; btn.classList.add("active"); }
+    setModePill(true);
+    pollFeed();
+  } else {
+    if (btn){ btn.textContent = "Live feed"; btn.classList.remove("active"); }
+    setModePill(false);
+    setLiveBanner();
+    warmupHistory();                   // give the simulator history again
+    setSpeed(15);
+  }
+  renderNodesTable(); updateCharts();
+}
+setInterval(pollFeed, FEED_POLL_MS);
+
+function tick(){
+  const now = performance.now();
+  const wallDelta = now - lastTickWall;
+  lastTickWall = now;
+  if (liveMode){ requestAnimationFrame(tick); return; }   // live data drives rendering
+  if (speedMult > 0){
+    simClock += wallDelta * speedMult;
+    ["1","2","3"].forEach(id=>{
+      if (simClock >= nextRead[id]){
+        stepFieldNode(nodes.find(n=>n.id===id));
+        nextRead[id] = simClock + READ_INTERVAL_MS + Math.random()*400;
+      }
+    });
+    if (simClock >= nextRead.R){
+      stepRainNode(false);
+      nextRead.R = simClock + READ_INTERVAL_MS + Math.random()*400;
+    }
+    renderFleetStats(); renderNodesTable(); renderRainCard(); renderEventsTable();
+    updateCharts(); updateMap();
+    // The prediction panel rebuilds its DOM and its chart, so it is driven by
+    // new readings rather than by animation frames.
+    if (predictDirty){
+      updateNodeDetail(); renderNodeChips(); renderPrediction();
+      predictDirty = false;
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+/* ---- controls ---- */
+function setSpeed(mult){
+  speedMult = Number(mult);
+  document.querySelectorAll(".controls-bar button[data-speed]").forEach(b=>
+    b.classList.toggle("active", Number(b.dataset.speed) === speedMult));
+}
+document.querySelectorAll(".controls-bar button[data-speed]").forEach(btn=>{
+  btn.addEventListener("click", ()=>setSpeed(btn.dataset.speed));
+});
+document.getElementById("trigger-flood").addEventListener("click", ()=>{ nodes.find(n=>n.id==="2").scenarioTick = 6; });
+
+/* =========================================================================
+   DEMO SEQUENCE — a fixed, repeatable run through the brief's cascade so a
+   recording hits the same beats every take. It drives the scenario clock
+   rather than writing readings directly, so the pipeline being demonstrated
+   is the real one: same thresholds, same debounce, same prediction.
+   ========================================================================= */
+const DEMO_STEPS = [
+  {at:0,   label:"Baseline — all fields normal",        run(){ demoReset(); }},
+  {at:6,   label:"Rain begins — gauge drops below 980", run(){ rainNode.scenarioTick = 0; }},
+  {at:16,  label:"Soil wetting — East Canal enters the watch band", run(){ nodes.find(n=>n.id==="2").scenarioTick = 10; }},
+  {at:30,  label:"Prediction: saturation projected ahead of the event", run(){ selectNode("2"); }},
+  {at:46,  label:"Saturation reached — soil at or below 436",  run(){ nodes.find(n=>n.id==="2").scenarioTick = 26; }},
+  {at:62,  label:"Standing water — flood confirmed, SMS fires", run(){ nodes.find(n=>n.id==="2").scenarioTick = 32; }},
+  {at:82,  label:"Draining — alert clears through hysteresis", run(){ nodes.find(n=>n.id==="2").scenarioTick = 52; }},
+];
+let demoTimer = null, demoT = 0;
+
+/* The projection leans on the live forecast, so on a dry real-world day it
+   correctly refuses to predict wetting that is not coming — which is right,
+   but leaves a recording with no lead time to show. While the sequence runs
+   it substitutes a synthetic forecast. That is the ONLY substituted input,
+   and the UI is marked "demo weather" throughout so it can never be mistaken
+   for the live Open-Meteo feed. */
+let demoWeather = null;
+function makeDemoWeather(){
+  const now = new Date(), times = [], prec = [];
+  for (let i=0;i<12;i++){
+    times.push(new Date(now.getTime()+i*3600e3).toISOString().slice(0,13));
+    prec.push(i < 5 ? 6 : 0);        // five wet hours, then clearing
+  }
+  return {current:{time:times[0], precipitation:6, temperature_2m:27, relative_humidity_2m:92, weather_code:65},
+          hourly:{time:times, precipitation:prec}};
+}
+
+function demoReset(){
+  nodes.forEach(n=>{ n.failed=false; n.failReason=null; n.state="NORMAL"; n.overCount=0; n.underCount=0; });
+  const e = nodes.find(n=>n.id==="2");
+  e.soil = 780; e.water = 0; e.scenarioTick = 0;
+  rainNode.raw = 1015; rainNode.scenarioTick = 40;
+  lastSmsSimTime = 0;
+}
+
+function setDemoBanner(text, step, total){
+  let el = document.getElementById("demo-banner");
+  if (!text){ if (el) el.remove(); return; }
+  if (!el){
+    el = document.createElement("div");
+    el.id = "demo-banner"; el.className = "demo-banner";
+    document.querySelector(".controls-bar").insertAdjacentElement("afterend", el);
+  }
+  el.innerHTML = `<span class="db-step">${step}/${total}</span><span class="db-text">${text}</span>
+    <span class="db-note">demo weather substituted</span>
+    <button class="db-stop" id="demo-stop">Stop</button>`;
+  document.getElementById("demo-stop").addEventListener("click", stopDemo);
+}
+
+function stopDemo(){
+  if (demoTimer) clearInterval(demoTimer);
+  demoTimer = null; demoT = 0; demoWeather = null;
+  setDemoBanner(null);
+  document.getElementById("run-demo").textContent = "Run sequence";
+}
+
+function startDemo(){
+  if (demoTimer){ stopDemo(); return; }
+  setSpeed(4);                       // 4x keeps the demo run near 90s of tape
+  demoWeather = makeDemoWeather();
+  demoT = 0;
+  document.getElementById("run-demo").textContent = "Stop sequence";
+  const last = DEMO_STEPS[DEMO_STEPS.length-1].at + 14;
+  const tick = ()=>{
+    const due = DEMO_STEPS.filter(s=>s.at === demoT);
+    due.forEach(s=>{
+      s.run();
+      setDemoBanner(s.label, DEMO_STEPS.indexOf(s)+1, DEMO_STEPS.length);
+      logLine(`DEMO ${s.label}`, "state");
+    });
+    demoT++;
+    if (demoT > last) stopDemo();
+  };
+  tick();
+  demoTimer = setInterval(tick, 1000);
+}
+document.getElementById("run-demo").addEventListener("click", startDemo);
+document.getElementById("live-btn").addEventListener("click", ()=>setLive(!liveMode));
+document.getElementById("trigger-storm").addEventListener("click", ()=>{ rainNode.scenarioTick = 0; });
+
+document.getElementById("theme-toggle").addEventListener("click", ()=>{
+  const next = effectiveTheme()==="dark" ? "light" : "dark";
+  applyThemeAttr(next);
+  try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
+  applyChartTheme();
+});
+
+/* =========================================================================
+   MANUAL ANALYSIS — on-demand fleet diagnostic. Generated client-side from
+   whatever the simulation currently shows; nothing here auto-refreshes.
+   ========================================================================= */
+function runDiagnostic(){
+  const time = new Date();
+  const lines = [];
+  let badCount = 0, warnCount = 0;
+
+  nodes.forEach(n=>{
+    const offline = isOffline(n);
+    const last = n.history[n.history.length-1];
+    if (offline){
+      badCount++;
+      const cause = n.failReason === "brownout"
+        ? `battery brownout at ${n.battery.toFixed(0)}% — should self-recover once it recharges past ${BATTERY_RECOVER_PCT}%`
+        : n.failReason === "manual"
+          ? "simulated radio/hardware fault — needs a manual restore, won't recover on its own"
+          : `no packet in over ${Math.round((Date.now()-n.lastSeen)/1000)}s — check power and radio link before assuming a software issue`;
+      lines.push({sev:"bad", text:`${n.name}: OFFLINE — ${cause}.`});
+    } else if (n.state === "ALERTED"){
+      warnCount++;
+      lines.push({sev:"warn", text:`${n.name}: ALERTED — soil ${n.soil}, water ${n.water}. ${n.smsCount} SMS sent this session.`});
+    } else if (n.battery <= BATTERY_LOW_PCT){
+      warnCount++;
+      lines.push({sev:"warn", text:`${n.name}: battery at ${n.battery.toFixed(0)}% — will likely brown out before the next charge cycle completes if this trend holds.`});
+    } else if (n.state === "WATCHING"){
+      lines.push({sev:"ok", text:`${n.name}: Watching — soil ${n.soil}, water ${n.water}, trending toward threshold but not sustained yet.`});
+    } else {
+      lines.push({sev:"ok", text:`${n.name}: Nominal — soil ${n.soil}, water ${n.water}, battery ${n.battery.toFixed(0)}%.`});
+    }
+  });
+
+  // Rain gauge + weather cross-check, when live weather has loaded
+  if (weatherCache){
+    const rain6h = sumRecentRain(weatherCache.data, 6);
+    const rainNodePct = rainIntensityPct(rainNode.raw);
+    if (rain6h >= 5 && rainNodePct < 20){
+      warnCount++;
+      lines.push({sev:"warn", text:`Rain gauge (planned) reads low (${rainNodePct.toFixed(0)}%) despite ${rain6h}mm of real regional rain in the last 6h — once built, this pattern would be worth checking for a stuck or miscalibrated sensor.`});
+    } else {
+      lines.push({sev:"ok", text:`Rain gauge reading is broadly consistent with the ${rain6h}mm of regional rain recorded in the last 6h.`});
+    }
+  }
+
+  const cooldownActive = lastSmsSimTime !== 0 && (simClock - lastSmsSimTime) < SMS_COOLDOWN_SIM_MS;
+  if (cooldownActive){
+    const remainMin = Math.max(1, Math.ceil((SMS_COOLDOWN_SIM_MS - (simClock - lastSmsSimTime))/60000));
+    lines.push({sev:"warn", text:`Global SMS cooldown is active (~${remainMin}m left) — a genuine new alert on any field would currently be suppressed, not just a duplicate.`});
+  }
+
+  const grade = badCount>0 ? "poor" : warnCount>0 ? "fair" : "good";
+  const gradeLabel = grade==="poor" ? "Needs attention" : grade==="fair" ? "Watch closely" : "Healthy";
+
+  const recs = [];
+  nodes.filter(isOffline).forEach(n=>{
+    if (n.failReason==="manual") recs.push(`Dispatch someone to physically check ${n.name} — simulated fault won't clear itself.`);
+    if (!n.direct && nodes.find(x=>x.id===n.relayVia) && isOffline(nodes.find(x=>x.id===n.relayVia))){
+      recs.push(`${n.name} relies on ${nodes.find(x=>x.id===n.relayVia).name} for its only path to the base station — both being down at once means total data loss for this field until either recovers.`);
+    }
+  });
+  if (nodes.some(n=>n.battery<=BATTERY_LOW_PCT && !isOffline(n))) recs.push("Battery trending low on at least one field node — worth reviewing solar panel angle ahead of the next storm.");
+  if (!recs.length) recs.push("No action needed right now — recheck after the next flagged event.");
+
+  const report = {time, grade, gradeLabel, lines, recs};
+  diagnosticHistory.unshift(report);
+  if (diagnosticHistory.length > 10) diagnosticHistory.pop();
+  renderDiagnosticHistory();
+}
+
+function renderDiagnosticHistory(){
+  const el = document.getElementById("diagnostic-history");
+  if (!diagnosticHistory.length){
+    el.innerHTML = '<div class="diag-empty">No diagnostic run yet.</div>';
+    return;
+  }
+  el.innerHTML = diagnosticHistory.map(r => `
+    <div class="diag-card">
+      <div class="diag-head">
+        <span class="diag-grade ${r.grade}">${r.gradeLabel}</span>
+        <span class="diag-time">${r.time.toLocaleTimeString([], {hour12:false})}</span>
+      </div>
+      <div class="diag-lines">
+        ${r.lines.map(l=>`<div class="diag-line ${l.sev}"><span class="dl-dot"></span><span>${l.text}</span></div>`).join("")}
+      </div>
+      <div class="diag-rec"><b>Recommended next steps:</b><ul>${r.recs.map(x=>`<li>${x}</li>`).join("")}</ul></div>
+    </div>
+  `).join("");
+}
+
+document.getElementById("run-diagnostic").addEventListener("click", runDiagnostic);
+document.getElementById("toggle-signal").addEventListener("click", (e)=>{
+  signalDegraded = !signalDegraded;
+  e.target.textContent = signalDegraded ? "Restore signal" : "Simulate weak signal";
+  e.target.classList.toggle("active", signalDegraded);
+  logLine(signalDegraded ? "Cellular signal degraded (simulated)" : "Cellular signal restored (simulated)", "cloud");
+});
+
+/* =========================================================================
+   FIELD-CAPACITY CALIBRATION WIZARD
+   Mirrors moisture_calibration_logger.ino's 3-replicate/5-reading protocol.
+   Readings are simulated bench samples (a hidden "true" mean is drawn once
+   per run), not pulled from any deployed field node — matching how the
+   real protocol works on a soil sample, not live field hardware.
+   ========================================================================= */
+let calRun = null;
+
+function startCalibration(){
+  calRun = { trueMean: 560 + (Math.random()*60-30), readings: [], replicate: 1, count: 0 };
+  document.getElementById("cal-progress").hidden = false;
+  document.getElementById("cal-start-btn").style.display = "none";
+  renderCalWizard();
+}
+function logCalReading(){
+  if (!calRun || calRun.readings.length >= 15) return;
+  const replicateDrift = (calRun.replicate-2)*8;
+  const raw = Math.round(calRun.trueMean + replicateDrift + (Math.random()*2-1)*22);
+  calRun.readings.push({replicate: calRun.replicate, raw});
+  calRun.count++;
+  if (calRun.count >= 5 && calRun.replicate < 3){ calRun.count = 0; calRun.replicate++; }
+  renderCalWizard();
+}
+function discardCalibration(){
+  calRun = null;
+  document.getElementById("cal-progress").hidden = true;
+  document.getElementById("cal-start-btn").style.display = "";
+}
+function completeCalibration(){
+  if (!calRun || calRun.readings.length < 15) return;
+  const raws = calRun.readings.map(r=>r.raw);
+  const mean = raws.reduce((a,b)=>a+b,0)/raws.length;
+  const min = Math.min(...raws), max = Math.max(...raws);
+  CAL_FC = mean;
+  document.getElementById("cal-fc-row").innerHTML =
+    `<td class="n">Field Capacity</td><td>${raws.length}</td><td>${mean.toFixed(1)}</td><td>${min}</td><td>${max}</td>`;
+  const note = document.getElementById("cal-status-note");
+  note.textContent = `✓ Calibration complete as of ${new Date().toLocaleTimeString([], {hour12:false})} — wetness %, risk score, and reset behavior now use the real Field-Capacity↔Saturated scale instead of the provisional Dry↔Saturated one.`;
+  note.style.background = "var(--green-bg)"; note.style.color = "var(--green)";
+  logLine(`Calibration complete — Field Capacity = ${mean.toFixed(1)} raw ADC (n=${raws.length})`, "state");
+  pushEvent("state", "Calibration", `Field Capacity calibrated: mean ${mean.toFixed(1)} raw (n=${raws.length})`);
+  calRun = null;
+  document.getElementById("cal-progress").hidden = true;
+  document.getElementById("cal-start-btn").style.display = "";
+  document.getElementById("cal-start-btn").textContent = "Re-run calibration";
+}
+function renderCalWizard(){
+  document.getElementById("cal-rep").textContent = calRun.replicate;
+  document.getElementById("cal-reading").textContent = calRun.count;
+  const total = calRun.readings.length;
+  document.getElementById("cal-progress-bar").style.width = (total/15*100)+"%";
+  document.getElementById("cal-log-table").innerHTML = calRun.readings.map((r,i)=>
+    `<tr><td>${i+1}</td><td>${r.replicate}</td><td class="n">${r.raw}</td></tr>`
+  ).join("") || `<tr><td colspan="3" style="text-align:center;color:var(--muted);">No readings yet</td></tr>`;
+  if (total > 0){
+    const raws = calRun.readings.map(r=>r.raw);
+    const mean = raws.reduce((a,b)=>a+b,0)/raws.length;
+    document.getElementById("cal-live-stats").textContent = `mean ${mean.toFixed(1)} · min ${Math.min(...raws)} · max ${Math.max(...raws)}`;
+  }
+  const done = total >= 15;
+  document.getElementById("cal-log-btn").style.display = done ? "none" : "";
+  document.getElementById("cal-complete-btn").style.display = done ? "" : "none";
+}
+function renderEconomics(){
+  const NODE_COST = 120, COMMERCIAL_COST = 1000;
+  const n = nodes.length;
+  const fleetCost = n*NODE_COST, commercialCost = n*COMMERCIAL_COST;
+  const tiles = [
+    {label:"Cost per node", value:"$"+NODE_COST},
+    {label:"This fleet", value:"$"+fleetCost},
+    {label:"Commercial equivalent", value:"$"+commercialCost.toLocaleString()},
+    {label:"Subscription", value:"$0<small>/mo</small>"},
+  ];
+  document.getElementById("economics-stats").innerHTML = tiles.map(t=>`
+    <div class="stat-tile ${t.cls||""}">
+      <div class="st-top"><span class="st-label">${t.label}</span></div>
+      <div class="st-value">${t.value}</div>
+    </div>`).join("");
+}
+
+document.getElementById("cal-start-btn").addEventListener("click", startCalibration);
+document.getElementById("cal-log-btn").addEventListener("click", logCalReading);
+document.getElementById("cal-discard-btn").addEventListener("click", discardCalibration);
+document.getElementById("cal-complete-btn").addEventListener("click", completeCalibration);
+
+document.getElementById("export-csv").addEventListener("click", ()=>{
+  let rows = ["node,type,t_ms,soil_raw,water_raw,health_index,wetness_pct,risk_score,rate_pct_per_min,rain_raw,rain_pct,battery_pct_speculative"];
+  nodes.forEach(n=>{
+    n.history.forEach(h=>{
+      rows.push(`${n.name},field,${h.t.toFixed(0)},${h.soil},${h.water},${h.health},${h.pct.toFixed(1)},${h.risk.toFixed(1)},${h.rate.toFixed(2)},,,${(h.battery??n.battery).toFixed(1)}`);
+    });
+  });
+  rainNode.history.forEach(h=>{
+    rows.push(`${rainNode.name},rain(planned),${h.t.toFixed(0)},,,,,,,${h.raw},${h.pct.toFixed(1)},`);
+  });
+  const blob = new Blob([rows.join("\n")], {type:"text/csv"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "fms_dev_console_export.csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+});
+
+/* =========================================================================
+   SIDEBAR
+
+   The nav marks the section currently under the top of the viewport. A
+   scroll listener rather than IntersectionObserver, because sections here
+   vary from one tile row to a full screen and "which one am I reading"
+   is simply the last one whose top has passed.
+   ========================================================================= */
+(function initNav(){
+  const links = Array.from(document.querySelectorAll("#sb-nav a"));
+  const sections = links
+    .map(a=>({a, el:document.getElementById(a.getAttribute("href").slice(1))}))
+    .filter(x=>x.el);
+  if (!sections.length) return;
+  let frame = null;
+  function mark(){
+    frame = null;
+    const y = window.scrollY + 120;
+    let current = sections[0];
+    sections.forEach(sc=>{ if (sc.el.offsetTop <= y) current = sc; });
+    links.forEach(a=>a.classList.toggle("on", a === current.a));
+  }
+  window.addEventListener("scroll", ()=>{ if (!frame) frame = requestAnimationFrame(mark); }, {passive:true});
+  window.addEventListener("resize", mark);
+  mark();
+})();
+
+setInterval(()=>{ document.getElementById("clock").textContent = new Date().toLocaleTimeString([], {hour12:false}); }, 1000);
+
+/* ---- boot ---- */
+const START_IN_DEMO = new URLSearchParams(location.search).get("mode") === "demo";
+if (START_IN_DEMO) {
+  const restoredEvents = loadStoredEvents();
+  if (restoredEvents) events = restoredEvents;
+  warmupHistory();
+  nodes.forEach(node=>{ if (node.state === "ALERTED") fireAlert(node, false); });
+} else {
+  liveMode = true;
+  setSpeed(0);
+  nodes.forEach(n=>{ n.history = []; n.lastSeen = 0; n.packets = 0; });
+  rainNode.history = []; rainNode.lastSeen = 0;
+}
+
+renderFleetStats(); renderNodesTable(); renderRainCard(); renderEventsTable();
+buildNodeDetailCards(); updateNodeDetail();
+initMap(); updateMap(); updateCharts(); applyChartTheme();
+// Open on whichever node is currently in the worst state, so the panel is
+// showing something useful before the technician touches anything.
+renderNodeChips();
+selectNode((nodes.find(n=>n.state==="ALERTED") || nodes.find(n=>n.state==="WATCHING") || nodes[0]).id);
+// The projection cross-checks live rain, so refresh it once weather lands.
+fetchWeather().then(()=>renderPrediction()).catch(()=>{});
+renderEconomics();
+if (START_IN_DEMO) {
+  logLine("Simulation started — generated readings", "rx");
+} else {
+  setLive(true);
+  logLine("Waiting for real sensor readings from the server", "rx");
+}
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

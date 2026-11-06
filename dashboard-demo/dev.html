@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FMS Dev Console</title>
+<title>FMS Live Field Console</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -385,6 +385,9 @@
   footer{margin-top:28px;padding-top:16px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted);}
   .btn{background:var(--ink);color:var(--card);border:none;padding:8px 16px;border-radius:999px;font-weight:550;font-size:12.5px;cursor:pointer;font-family:inherit;}
   .btn.ghost{background:transparent;border:1px solid var(--card-border);color:var(--ink-soft);}
+body[data-mode="live"] .controls-bar button:not(#live-btn),
+body[data-mode="live"] [data-toggle-fail],
+body[data-mode="live"] #cal-start-btn { display:none !important; }
 </style>
 </head>
 <body>
@@ -456,7 +459,7 @@
     <div class="predict-wrap">
       <div class="panel predict-map-panel">
         <h4>Field map</h4>
-        <div class="c-sub">Three nodes across the paddy block.</div>
+        <div class="c-sub">Configured node locations; coordinates are provisioned until GNSS is verified.</div>
         <div id="map"></div>
         <div class="map-legend">
           <span><i style="background:var(--accent)"></i>Normal</span>
@@ -530,7 +533,7 @@
       <div class="chart-card"><h4>Soil moisture</h4><div class="c-sub">Raw ADC — falls as soil wets</div><canvas id="chart-soil"></canvas></div>
       <div class="chart-card"><h4>Water level</h4><div class="c-sub">Raw ADC — rises as water stands</div><canvas id="chart-water"></canvas></div>
       <div class="chart-card"><h4>Soil health index</h4><div class="c-sub">0–100, derived from soil moisture</div><canvas id="chart-health"></canvas></div>
-      <div class="chart-card"><h4>Flood risk</h4><div class="c-sub">Composite of wetness and water level</div><canvas id="chart-risk"></canvas></div>
+      <div class="chart-card"><h4 id="risk-chart-title">Reported flood level</h4><div class="c-sub" id="risk-chart-sub">0 Normal · 1 Watch · 2 Warning · 3 Flood</div><canvas id="chart-risk"></canvas></div>
       <div class="chart-card"><h4>Rate of change</h4><div class="c-sub">Percent of scale per minute</div><canvas id="chart-rate"></canvas></div>
     </div>
     <div class="chart-legend" id="chart-legend"></div>
@@ -649,7 +652,7 @@
         <p>Rain and water are on/off only. Fast-drop is excluded from the warning level until calibrated.</p>
       </div>
       <div class="prov-col">
-        <h5 class="sim-h">Simulated here</h5>
+        <h5 class="sim-h">Demo mode only</h5>
         <ul>
           <li>All node readings and scenarios</li>
           <li>Battery, brownout, offline state</li>
@@ -662,7 +665,7 @@
   </section>
 
   <footer>
-    <div>Local, simulated telemetry — not connected to real hardware.</div>
+    <div id="source-footer">Waiting for sensor readings.</div>
     <button class="btn ghost" id="export-csv">Download raw data (CSV)</button>
   </footer>
 
@@ -1058,13 +1061,23 @@ function stepRainNode(silent){
    Fault handling is the brief's too: a soil reading at/above 960 means the
    probe is out of the ground, so it is dropped from the decision rather
    than read as "very dry". */
+function nodeRainRaw(node){
+  return liveMode ? (Number.isFinite(node.rain) ? node.rain : null) : rainNode.raw;
+}
 function assessLevel(node){
   const soilFault = node.soil >= SOIL_FAULT_FLOOR;
-  const raining = rainNode.raw < RAIN_THRESHOLD;
+  const rawRain = nodeRainRaw(node);
+  const raining = rawRain !== null && rawRain < RAIN_THRESHOLD;
   const waterContact = node.water > WATER_FLOOD_THRESHOLD;
   const soilSaturated = !soilFault && node.soil <= SOIL_FLOOD_THRESHOLD;
   const soilWet = !soilFault && node.soil <= SOIL_WATCH_THRESHOLD;
   const droppingFast = !soilFault && node.rapidFlagged && RAPID_DROP_CALIBRATED;
+  if (liveMode && Number.isInteger(node.reportedRisk)) {
+    const level = node.reportedRisk;
+    const reasons = ["Gateway reports no crossed alert threshold", "Gateway reports watch-level conditions", "Gateway reports warning-level conditions", "Water probe above threshold — inspect the node and field"];
+    return {level, key:["NORMAL","WATCH","WARNING","FLOOD"][level], reason:reasons[level],
+            unsupported:level===3 && !raining && !soilWet, soilFault};
+  }
 
   if (waterContact){
     // Water with no supporting rain or soil signal is the brief's
@@ -1089,6 +1102,11 @@ const LEVEL_STATE = {0:"NORMAL", 1:"WATCHING", 2:"WATCHING", 3:"ALERTED"};
 
 function evaluateAlertState(node, silent){
   const a = assessLevel(node);
+  if (liveMode && Number.isInteger(node.reportedRisk)) {
+    node.level = a.level; node.levelReason = a.reason; node.state = LEVEL_STATE[a.level];
+    node.unsupportedWater = !!a.unsupported; node.soilFault = !!a.soilFault;
+    return; // Report the gateway's state; do not simulate a second SMS/alert pipeline.
+  }
   node.level = a.level;
   node.levelReason = a.reason;
   node.unsupportedWater = !!a.unsupported;
@@ -1131,6 +1149,8 @@ function evaluateAlertState(node, silent){
 }
 
 function fireAlert(node, silent){
+  // The browser has no delivery receipt and must never claim an SMS was sent.
+  if (liveMode) return;
   if (silent){ node.smsCount++; return; }
   const onCooldown = lastSmsSimTime !== 0 && (simClock - lastSmsSimTime) < SMS_COOLDOWN_SIM_MS;
   if (onCooldown){
@@ -1256,7 +1276,7 @@ function fleetDelta(pick, back){
     const a = h[h.length-1], b = h[h.length-1-back];
     if (a.t - b.t > DELTA_MAX_SPAN_MS) return;
     const now = pick(a), then = pick(b);
-    if (!isFinite(now) || !isFinite(then) || then === 0) return;
+    if (!Number.isFinite(now) || !Number.isFinite(then) || then === 0) return;
     ds.push((now-then)/Math.abs(then)*100);
   });
   return ds.length ? ds.reduce((x,y)=>x+y,0)/ds.length : null;
@@ -1278,7 +1298,7 @@ function renderFleetStats(){
   const watching = nodes.filter(n=>!isOffline(n) && n.state==="WATCHING").length;
   // In live mode a node with no history has no reading to average; including
   // its stale simulated value would blend real and invented data.
-  const reporting = liveMode ? nodes.filter(n=>n.history.length) : nodes;
+  const reporting = liveMode ? nodes.filter(n=>n.history.length && !isOffline(n)) : nodes;
   const avg = (fn)=> reporting.length
     ? reporting.reduce((s,n)=>s+fn(n),0)/reporting.length : 0;
   const last = n => n.history[n.history.length-1];
@@ -1293,14 +1313,18 @@ function renderFleetStats(){
   const avgSoil = avgOf(soilValid, n=>n.soil);
   const avgHealth = avgOf(soilValid, n=>{const l=last(n); return l?l.health:calculateSoilHealth(n.soil);});
   const avgRisk = avg(n=>{const l=last(n); return l?l.risk:0;}).toFixed(0);
-  const avgBattery = avg(n=>n.battery).toFixed(0);
+  const reportedLevels = reporting.map(n=>n.reportedRisk).filter(Number.isInteger);
+  const reportedLevel = reportedLevels.length ? Math.max(...reportedLevels) : null;
+  const avgBattery = avgOf(reporting.filter(n=>Number.isFinite(n.battery)), n=>n.battery);
   const lowBatteryCount = nodes.filter(n=>n.battery<=BATTERY_LOW_PCT).length;
   const none = reporting.length === 0;
 
   // The cellular link has no tile of its own any more; it lives in the page
   // header, where the "Weak signal" control still has somewhere to show.
   const linkEl = document.getElementById("link-pill");
-  if (linkEl){
+  if (linkEl && liveMode) {
+    linkEl.innerHTML = `<i style="background:${liveError ? 'var(--red)' : 'var(--muted)'}"></i><span>${liveError ? 'Feed unavailable' : 'Sensor feed · signal not reported'}</span>`;
+  } else if (linkEl){
     const csq = csqInfo(cellularCSQ);
     const completeness = cloudUploadAttempts ? (cloudUploadSuccesses/cloudUploadAttempts*100) : 100;
     const tone = csq.cls === "bad" ? "var(--red)" : csq.cls === "warn" ? "var(--amber)" : "var(--green)";
@@ -1316,12 +1340,13 @@ function renderFleetStats(){
     {label:"Soil health", value: (none||avgHealth===null)?"—":`${avgHealth}<small>/100</small>`,
      delta: faulted ? `<span class="st-delta">${faulted} probe fault${faulted>1?"s":""}</span>`
                     : deltaBadge(fleetDelta(h=>h.health, DELTA_WINDOW), true)},
-    {label:"Flood risk", value: none?"—":`${avgRisk}<small>/100</small>`,
-     cls: avgRisk>=60?"bad":avgRisk>=35?"warn":"",
-     delta: deltaBadge(fleetDelta(h=>h.risk, DELTA_WINDOW), false)},
+    liveMode ? {label:"Reported flood level", value:reportedLevel===null?"—":RISK_LEVEL_LABELS[reportedLevel],
+      cls:reportedLevel>=2?"bad":reportedLevel===1?"warn":""}
+    : {label:"Derived risk score", value:none?"—":`${avgRisk}<small>/100</small>`,
+       cls:avgRisk>=60?"bad":avgRisk>=35?"warn":"", delta:deltaBadge(fleetDelta(h=>h.risk, DELTA_WINDOW), false)},
     {label:"Soil moisture", value: (none||avgSoil===null)?"—":`${avgSoil}<small> ADC</small>`,
      delta: deltaBadge(fleetDelta(h=>h.soil, DELTA_WINDOW), null)},
-    {label:"Battery", value: none?"—":`${avgBattery}<small>%</small>`,
+    {label:"Battery", value: (none || avgBattery === null)?"—":`${avgBattery}<small>%</small>`,
      cls: lowBatteryCount?"warn":"",
      delta: deltaBadge(fleetDelta(h=>h.battery, DELTA_WINDOW), true)},
   ];
@@ -1341,6 +1366,7 @@ function fmtAgo(secs){
 
 function batteryCellHtml(node){
   const pct = node.battery;
+  if (!Number.isFinite(pct)) return "—";
   const cls = pct <= BATTERY_BROWNOUT_PCT*3 ? "bad" : pct <= BATTERY_LOW_PCT ? "warn" : "";
   return `<div class="battery-cell">
     <div class="battery-bar"><div class="battery-fill ${cls}" style="width:${pct.toFixed(0)}%"></div></div>
@@ -1368,8 +1394,8 @@ function renderNodesTable(){
       <td>${noData?"—":batteryCellHtml(n)}</td>
       <td class="n">${D(n.soil)}</td>
       <td class="n">${D(n.water)}</td>
-      <td class="n">${D(last.health)}</td>
-      <td class="n">${noData?"—":last.risk.toFixed(0)}</td>
+      <td class="n">${noData || (liveMode && n.soil >= SOIL_FAULT_FLOOR) ? "—" : last.health}</td>
+      <td class="n">${noData?"—":liveMode?(RISK_LEVEL_LABELS[n.reportedRisk]??"—"):last.risk.toFixed(0)}</td>
       <td>${noData?"never":lastSeenStr}</td>
       <td style="text-align:right;"><button class="action-btn ${n.failed?'restore':'fail'}" data-toggle-fail="${n.id}">${n.failed ? "Restore" : "Fail"}</button></td>
     </tr>`;
@@ -1385,6 +1411,11 @@ const RAIN_TREND_ICONS = {
   flat: '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round"><path d="M4 12h16"/></svg>'
 };
 function renderRainCard(){
+  if (liveMode && !rainNode.history.length) {
+    ["rain-raw", "rain-pct", "rain-state", "rain-lastseen"].forEach(id=>document.getElementById(id).textContent = "—");
+    document.getElementById("rain-trend").textContent = "Not deployed";
+    return;
+  }
   const hist = rainNode.history;
   const last = hist[hist.length-1] || {raw:rainNode.raw, pct:rainIntensityPct(rainNode.raw)};
   const prev = hist[hist.length-2];
@@ -1474,10 +1505,12 @@ function updateCharts(){
     chartSoil.data.datasets[idx].data = n.history.map(h=>h.soil);
     chartWater.data.datasets[idx].data = n.history.map(h=>h.water);
     chartHealth.data.datasets[idx].data = n.history.map(h=>h.health);
-    chartRisk.data.datasets[idx].data = n.history.map(h=>h.risk);
+    chartRisk.data.datasets[idx].data = n.history.map(h=>liveMode ? h.reportedRisk : h.risk);
     chartRate.data.datasets[idx].data = n.history.map(h=>h.rate);
     chartBattery.data.datasets[idx].data = n.history.map(h=>h.battery);
   });
+  chartRisk.options.scales.y.max = liveMode ? 3 : 100;
+  chartRisk.options.scales.y.ticks.stepSize = liveMode ? 1 : 20;
   chartSoil.update(); chartWater.update(); chartHealth.update(); chartRisk.update(); chartRate.update(); chartBattery.update();
 
   chartRain.data.labels = rainNode.history.map((_,i)=>i);
@@ -1544,6 +1577,8 @@ function updateMap(){
   nodes.forEach(n=>{
     const offline = isOffline(n);
     const color = nodeStateColor(n);
+    nodeMarkers[n.id].setLatLng([n.loc.lat, n.loc.lon]);
+    linkLines[n.id].setLatLngs([[BASE_LOC.lat, BASE_LOC.lon], [n.loc.lat, n.loc.lon]]);
     nodeMarkers[n.id].setIcon(makeDivIcon(color, offline, n.id===selectedNodeId));
     linkLines[n.id].setStyle({color, opacity: offline ? .25 : n.state==="NORMAL" ? .4 : .8});
   });
@@ -1714,7 +1749,8 @@ function rainSchedule(data){
    so guessing it would be inventing the number the brief says is missing. */
 function floodForecast(node, p, data){
   const sched = rainSchedule(data);
-  const rainingNow = rainNode.raw < RAIN_THRESHOLD;
+  const rawRain = nodeRainRaw(node);
+  const rainingNow = rawRain !== null && rawRain < RAIN_THRESHOLD;
   let soil = p.last.soil, water = p.last.water;
   let vSoil = p.soilPerMin;            // ADC/min, negative = wetting
   const vWater = p.waterPerMin;
@@ -1897,7 +1933,7 @@ function renderPrediction(){
       ? ` Forecast says ${f.fc.h6}mm/6h while the ground is steady — the trend cannot see that coming.`
       : ` Ground is wetting with only ${f.fc.h6}mm forecast — check irrigation, drainage or the probe.`;
   }
-  if (a.unsupported) text += ` Rain and soil both read dry — check the node for splash or a fault.`;
+  if (a.unsupported) text += ` Valid soil/rain readings do not corroborate the water alert — inspect for splash or a sensor fault.`;
   if (a.soilFault) text += ` Soil probe reads ≥${SOIL_FAULT_FLOOR}; excluded from the decision.`;
   text += ` Confidence <b>${f.confidence.label}</b>${f.confidence.reasons.length?` (${f.confidence.reasons.join("; ")})`:""}.`;
 
@@ -1909,7 +1945,7 @@ function renderPrediction(){
     <div class="predict-metrics">
       <div class="pm"><div class="k">Soil</div><div class="v">${p.last.soil}</div><div class="s">${p.soilPerMin>=0?"+":""}${p.soilPerMin.toFixed(1)}/min</div></div>
       <div class="pm"><div class="k">Water</div><div class="v">${p.last.water}</div><div class="s">${p.waterPerMin>=0?"+":""}${p.waterPerMin.toFixed(1)}/min</div></div>
-      <div class="pm"><div class="k">Rain</div><div class="v">${rainNode.raw}</div></div>
+      <div class="pm"><div class="k">Rain</div><div class="v">${nodeRainRaw(node)??"—"}</div></div>
       <div class="pm"><div class="k">Saturation</div><div class="v">${fmtEta(f.satAt)}</div></div>
       <div class="pm"><div class="k">Flood</div><div class="v">${fmtEta(f.floodEta)}</div></div>
       <div class="pm"><div class="k">Zone</div><div class="v" style="font-size:10.5px;">${zone.short}${zone.est?' <span class="est">est.</span>':''}</div></div>
@@ -1960,7 +1996,7 @@ function renderAdvisory(node, p, f, a, reason){
   let cls = "", body;
   if (a.level >= 3){
     cls = "bad";
-    body = `${field}: water is standing in the field now. Move anything you can off this block and check the drain on the canal side.`;
+    body = `${field}: the water probe is above its alert threshold. Check the field and probe placement promptly. If standing water is confirmed, move vulnerable equipment and check drainage.`;
   } else if (f.satAt !== null && f.satAt <= 90){
     cls = "warn";
     body = `${field}: ground is filling up. On current rain you have roughly ${fmtEta(f.satAt)} before it is saturated.`
@@ -1980,7 +2016,7 @@ function renderAdvisory(node, p, f, a, reason){
   // The technician view keeps the numbers the farmer message deliberately drops.
   const bits = [];
   bits.push(`<b>L${a.level}</b> — ${a.reason}.`);
-  bits.push(`Soil <b>${p.last.soil}</b> (${zone.label}${zone.est?", est band":""}), water <b>${p.last.water}</b>, rain <b>${rainNode.raw}</b>.`);
+  bits.push(`Soil <b>${p.last.soil}</b> (${zone.label}${zone.est?", est band":""}), water <b>${p.last.water}</b>, rain <b>${nodeRainRaw(node)??"unavailable"}</b>.`);
   bits.push(`Trend <b>${p.soilPerMin>=0?"+":""}${p.soilPerMin.toFixed(1)}</b> ADC/min, fit r²=<b>${p.r2.toFixed(2)}</b>.`);
   if (lead !== null) bits.push(`Projected <b>${fmtEta(lead)}</b> to ${f.floodEta!==null?"standing water":"saturation"}, confidence <b>${f.confidence.label}</b>.`);
   if (f.agrees === false) bits.push(`<b>Forecast disagrees with the ground</b> — ${f.fc.h6}mm/6h expected. Check irrigation, drainage or the probe.`);
@@ -2112,7 +2148,7 @@ function updateNodeDetail(){
     const zone = soilZone(last.soil);
     const hEl = document.getElementById(`nd-health-${n.id}`);
     hEl.className = `nd-health ${band}`;
-    hEl.querySelector(".h-val").textContent = offline ? "—" : last.health;
+    hEl.querySelector(".h-val").textContent = offline || (liveMode && last.soil >= SOIL_FAULT_FLOOR) ? "—" : last.health;
     document.getElementById(`nd-zone-${n.id}`).innerHTML =
       offline ? "offline" : `${zone.label}${zone.est ? ' <span class="est">est.</span>' : ''}`;
 
@@ -2170,7 +2206,7 @@ async function fetchWeather(){
         <div class="weather-stat"><div class="ws-label">6h total</div><div class="ws-value">${rain6h}mm</div></div>
         <div class="weather-stat"><div class="ws-label">24h total</div><div class="ws-value">${rain24h}mm</div></div>
       </div>
-      <div style="font-size:10.5px; color:var(--muted); margin-top:8px;">Real 6h rain vs. planned rain gauge reading right now: <b>${rainIntensityPct(rainNode.raw).toFixed(0)}%</b> intensity on our placeholder scale — once real, these two numbers should track each other closely.</div>
+      <div style="font-size:10.5px; color:var(--muted); margin-top:8px;">${liveMode ? "Regional weather estimate; the planned central rain gauge has no readings." : `Simulated rain gauge intensity: ${rainIntensityPct(rainNode.raw).toFixed(0)}% on a placeholder scale.`}</div>
     `;
   } catch(e){
     document.getElementById("weather-card").innerHTML = `<div class="weather-error">Couldn't reach api.open-meteo.com. <button class="btn ghost" id="weather-retry" style="margin-top:6px;">Retry</button></div>`;
@@ -2203,8 +2239,7 @@ async function fetchWeather(){
 const FEED_URL = (() => {
   const q = new URLSearchParams(location.search).get("feed");
   if (q) return q.replace(/\/+$/, "");
-  const local = /^(localhost|127\.0\.0\.1|\[::1\]|)$/.test(location.hostname);
-  if (location.protocol.startsWith("http") && !local) return location.origin + "/feed";
+  if (location.protocol.startsWith("http")) return location.origin + "/feed";
   return "http://localhost:8080/feed";
 })();
 const FEED_POLL_MS = 4000;
@@ -2213,6 +2248,7 @@ const FEED_POLL_MS = 4000;
    uploads 20s apart, and a retry or a weak-signal window stretches it
    further. 10 minutes matches NODE_OFFLINE_MS in Base_Code.ino, so the
    dashboard and the base station agree on what "offline" means. */
+const RISK_LEVEL_LABELS = ["Normal", "Watch", "Warning", "Flood"];
 const LIVE_OFFLINE_MS = 600000;
 let liveMode = false, liveLastId = 0, liveSeen = 0, liveError = null;
 
@@ -2236,7 +2272,7 @@ function setLiveBanner(){
       + (age ? ` &middot; newest ${age} ago` : ` &middot; none yet`);
   el.innerHTML = `<span class="db-step" style="color:var(--green)">LIVE</span>
     <span class="db-text">Real readings from the base station — simulator stopped. ${state}</span>
-    <button class="db-stop" id="live-stop" style="border-color:var(--green); color:var(--green)">Back to simulator</button>`;
+    <button class="db-stop" id="live-stop" style="border-color:var(--green); color:var(--green)">Open simulated demo</button>`;
   document.getElementById("live-stop").addEventListener("click", ()=>setLive(false));
 }
 
@@ -2244,11 +2280,13 @@ function setLiveBanner(){
 // consumer (prediction, advisory, charts, map) works untouched.
 function ingestRows(rows){
   let added = 0;
-  rows.slice().reverse().forEach(r=>{
+  rows.slice().sort((a,b)=>a.id-b.id).forEach(r=>{
     if (r.id <= liveLastId) return;
     liveLastId = r.id;
     const node = nodes.find(n=>n.id === String(r.node));
     if (!node) return;
+    // A delayed upload must not roll the latest field state backwards.
+    if (node.lastSeen && r.ts < node.lastSeen) return;
     const soil = r.soil, water = r.water;
     if (soil === null || water === null) return;
     const health = calculateSoilHealth(soil);
@@ -2261,16 +2299,19 @@ function ingestRows(rows){
     const dtMin = prev ? (r.ts - prev.t) / 60000 : 0;
     const rate = (prev && dtMin > 0) ? (pct - prev.pct) / dtMin : 0;
     node.soil = soil; node.water = water;
-    if (r.batt_pct !== null) node.battery = r.batt_pct;
+    node.rain = Number.isFinite(r.rain) ? r.rain : null;
+    node.reportedRisk = Number.isInteger(r.risk) && r.risk>=0 && r.risk<=3 ? r.risk : null;
+    node.battery = Number.isFinite(r.batt_pct) ? r.batt_pct : null;
+    if (Number.isFinite(r.lat) && Number.isFinite(r.lon)) node.loc = {lat:r.lat, lon:r.lon};
     node.history.push({t: r.ts, soil, water, health, pct,
-                       risk: riskScore(pct, water), rate, battery: node.battery});
+                       risk: riskScore(pct, water), reportedRisk:node.reportedRisk, rate, battery: node.battery});
     if (node.history.length > 60) node.history.shift();
     node.packets++; node.failed = false;
     // When the server received it, never when we read it off the feed.
     // Stamping Date.now() here made a three-day-old reading display as
     // "0s ago" and kept a dead node permanently online.
     node.lastSeen = r.ts;
-    evaluateAlertState(node, false);
+    evaluateAlertState(node, r.ts < Date.now() - FEED_POLL_MS * 2);
     predictDirty = true;
     added++;
   });
@@ -2292,8 +2333,11 @@ async function pollFeed(){
       renderNodeChips(); renderPrediction();
     }
   } catch(e){
-    liveError = `server unreachable (${FEED_URL}) — is fms_server.py running?`;
+    liveError = "Feed unavailable — showing the last received readings with their original timestamps";
   }
+  // Freshness keeps updating even when the server has no new rows.
+  renderFleetStats(); renderNodesTable(); renderRainCard();
+  updateNodeDetail(); renderNodeChips(); renderPrediction(); updateMap();
   setLiveBanner();
 }
 
@@ -2305,6 +2349,12 @@ function setModePill(live){
   if (!pill || !label) return;
   pill.classList.toggle("live", !!live);
   label.textContent = live ? "Live feed" : "Simulated";
+  document.body.dataset.mode = live ? "live" : "demo";
+  document.getElementById("risk-chart-title").textContent = live ? "Reported flood level" : "Derived risk score";
+  document.getElementById("risk-chart-sub").textContent = live ? "0 Normal · 1 Watch · 2 Warning · 3 Flood" : "Uncalibrated composite of wetness and water level";
+  document.getElementById("source-footer").textContent = live
+    ? "Sensor readings from the server. Signal strength and SMS delivery are not reported."
+    : "Simulated telemetry — generated for demonstration.";
 }
 
 function setLive(on){
@@ -2323,7 +2373,7 @@ function setLive(on){
     // to show rather than a simulated trace.
     rainNode.history = []; rainNode.packets = 0; rainNode.lastSeen = 0;
     liveLastId = 0; liveSeen = 0; liveError = null;
-    if (btn){ btn.textContent = "Stop live feed"; btn.classList.add("active"); }
+    if (btn){ btn.textContent = "Open simulated demo"; btn.classList.add("active"); }
     setModePill(true);
     pollFeed();
   } else {
@@ -2703,11 +2753,18 @@ document.getElementById("export-csv").addEventListener("click", ()=>{
 setInterval(()=>{ document.getElementById("clock").textContent = new Date().toLocaleTimeString([], {hour12:false}); }, 1000);
 
 /* ---- boot ---- */
-const restoredEvents = loadStoredEvents();
-if (restoredEvents) events = restoredEvents;
-
-warmupHistory();
-nodes.forEach(node=>{ if (node.state === "ALERTED") fireAlert(node, false); });
+const START_IN_DEMO = new URLSearchParams(location.search).get("mode") === "demo";
+if (START_IN_DEMO) {
+  const restoredEvents = loadStoredEvents();
+  if (restoredEvents) events = restoredEvents;
+  warmupHistory();
+  nodes.forEach(node=>{ if (node.state === "ALERTED") fireAlert(node, false); });
+} else {
+  liveMode = true;
+  setSpeed(0);
+  nodes.forEach(n=>{ n.history = []; n.lastSeen = 0; n.packets = 0; });
+  rainNode.history = []; rainNode.lastSeen = 0;
+}
 
 renderFleetStats(); renderNodesTable(); renderRainCard(); renderEventsTable();
 buildNodeDetailCards(); updateNodeDetail();
@@ -2719,11 +2776,12 @@ selectNode((nodes.find(n=>n.state==="ALERTED") || nodes.find(n=>n.state==="WATCH
 // The projection cross-checks live rain, so refresh it once weather lands.
 fetchWeather().then(()=>renderPrediction()).catch(()=>{});
 renderEconomics();
-logLine("Base Module Starting...", "rx");
-logLine("Sensor Node 1 Starting...", "rx");
-logLine("Sensor Node 2 Starting...", "rx");
-logLine("Sensor Node 3 Starting...", "rx");
-logLine("Rain Gauge: not yet deployed — simulated for integration testing", "rain");
+if (START_IN_DEMO) {
+  logLine("Simulation started — generated readings", "rx");
+} else {
+  setLive(true);
+  logLine("Waiting for real sensor readings from the server", "rx");
+}
 requestAnimationFrame(tick);
 </script>
 </body>

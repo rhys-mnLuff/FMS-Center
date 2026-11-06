@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FMS Field Forecast</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Same surfaces, spacing and palette as dev.html, so the two pages read as
+     one product rather than two prototypes. */
+  :root{
+    --bg:#f3f4f2; --bg-soft:#f0f1ee; --card:#ffffff; --card-border:#e7e8e3;
+    --ink:#1a211d; --ink-soft:#4d5751; --muted:#8c948e; --line:#eeefea;
+    --green:#1d7a54; --green-bg:#e7f4ed; --accent:#62b58c;
+    --amber:#8a6210; --amber-bg:#fbf1dc;
+    --red:#b23b2d; --red-bg:#fbeae7;
+    --water:#2b6490; --water-bg:#e9f0f6;
+    --purple:#5b4ea8; --purple-bg:#ece9f7;
+    --radius:16px; --radius-sm:11px; --radius-xs:8px;
+    --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0e1211; --bg-soft:#171c1a; --card:#151a18; --card-border:#242b28;
+      --ink:#e6eae7; --ink-soft:#a8b2ad; --muted:#6f7a74; --line:#222927;
+      --green:#4cba88; --green-bg:#122b21; --accent:#4cba88;
+      --amber:#d7a44a; --amber-bg:#2c2413;
+      --red:#e07262; --red-bg:#301b18;
+      --water:#5da5db; --water-bg:#122534;
+      --purple:#9b8ce0; --purple-bg:#1d1930;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0e1211; --bg-soft:#171c1a; --card:#151a18; --card-border:#242b28;
+    --ink:#e6eae7; --ink-soft:#a8b2ad; --muted:#6f7a74; --line:#222927;
+    --green:#4cba88; --green-bg:#122b21; --accent:#4cba88;
+    --amber:#d7a44a; --amber-bg:#2c2413;
+    --red:#e07262; --red-bg:#301b18;
+    --water:#5da5db; --water-bg:#122534;
+    --purple:#9b8ce0; --purple-bg:#1d1930;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{background:var(--bg); color:var(--ink); font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; font-size:13.5px; -webkit-font-smoothing:antialiased;}
+  h1,h2,h3,h4,h5{margin:0; letter-spacing:-.02em;}
+  a{color:var(--water); text-decoration:none;}
+
+  /* ---------- shell (mirrors dev.html) ---------- */
+  .sidebar{
+    position:fixed; top:12px; left:12px; bottom:12px; width:218px; z-index:40;
+    background:var(--card); border:1px solid var(--card-border); border-radius:18px;
+    padding:16px 12px 14px; display:flex; flex-direction:column; gap:14px;
+  }
+  .sb-brand{display:flex; align-items:center; gap:9px; padding:4px 8px 2px;}
+  .sb-mark{width:26px; height:26px; border-radius:8px; background:var(--ink); color:var(--card);
+    display:flex; align-items:center; justify-content:center; flex:none;}
+  .sb-mark svg{width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;}
+  .sb-brand b{font-size:14.5px; font-weight:600; letter-spacing:-0.02em;}
+  .sb-nav{display:flex; flex-direction:column; gap:1px; overflow-y:auto; flex:1; margin:0 -2px;}
+  .sb-nav a{display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px;
+    font-size:13px; color:var(--ink-soft); text-decoration:none; font-weight:450;}
+  .sb-nav a svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex:none; opacity:.8;}
+  .sb-nav a:hover{background:var(--bg-soft); color:var(--ink);}
+  .sb-nav a.on{background:var(--bg-soft); color:var(--ink); font-weight:550;}
+  .sb-nav a.on svg{opacity:1; color:var(--green);}
+  .sb-foot{border-top:1px solid var(--line); padding-top:10px; display:flex; flex-direction:column; gap:3px;}
+  .sb-foot a, .sb-foot button{display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:10px;
+    font-size:13px; color:var(--ink-soft); text-decoration:none; font-weight:450;
+    background:transparent; border:none; cursor:pointer; font-family:inherit; width:100%; text-align:left;}
+  .sb-foot a svg, .sb-foot button svg{width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex:none; opacity:.8;}
+  .sb-foot a:hover, .sb-foot button:hover{background:var(--bg-soft); color:var(--ink);}
+  .icon-moon{display:none;}
+  :root[data-theme="dark"] .icon-sun{display:none;}
+  :root[data-theme="dark"] .icon-moon{display:block;}
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]) .icon-sun{display:none;}
+    :root:not([data-theme="light"]) .icon-moon{display:block;}
+  }
+  .main{margin-left:246px; padding:22px 24px 56px; max-width:1400px;}
+  @media (max-width:960px){
+    .sidebar{position:static; width:auto; margin:10px 10px 0; bottom:auto; flex-direction:row;
+      align-items:center; gap:10px; padding:10px 12px; border-radius:14px;}
+    .sb-nav{flex-direction:row; overflow-x:auto; gap:2px; flex:1;}
+    .sb-nav a{white-space:nowrap; padding:7px 10px;}
+    .sb-nav a svg{display:none;}
+    .sb-foot{border-top:none; border-left:1px solid var(--line); padding:0 0 0 10px; flex-direction:row;}
+    .sb-foot a span, .sb-foot button span{display:none;}
+    .main{margin-left:0; padding:16px 12px 48px;}
+  }
+
+  .page-head{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin:4px 2px 20px;}
+  .page-head h1{font-size:27px; font-weight:600; letter-spacing:-0.03em;}
+  .head-right{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .hpill{display:inline-flex; align-items:center; gap:7px; background:var(--card);
+    border:1px solid var(--card-border); border-radius:999px; padding:7px 14px;
+    font-size:12.5px; color:var(--ink-soft); font-weight:450;}
+  .hpill svg{width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; opacity:.75;}
+  #clock{font-variant-numeric:tabular-nums;}
+  .btn{background:transparent; border:1px solid var(--card-border); color:var(--ink-soft);
+    padding:7px 14px; border-radius:999px; font-size:12.5px; font-weight:500; cursor:pointer; font-family:inherit;}
+  .btn:hover{border-color:var(--muted); color:var(--ink);}
+  .btn.active{background:var(--ink); color:var(--card); border-color:var(--ink);}
+
+  .section-title{display:flex;align-items:baseline;justify-content:space-between;margin:30px 2px 12px;flex-wrap:wrap;gap:6px;}
+  .section-title h2{font-size:16px;font-weight:600;letter-spacing:-0.02em;color:var(--ink);}
+  .section-title span{font-size:12px;color:var(--muted);}
+
+  /* ---------- regional banner: the public feed, unmodified ---------- */
+  .regional{display:grid; grid-template-columns:auto 1fr; gap:28px; align-items:center;
+    background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:20px 22px;}
+  @media (max-width:760px){ .regional{grid-template-columns:1fr;} }
+  .reg-now{display:flex; align-items:center; gap:18px;}
+  .reg-temp{font-size:42px; font-weight:600; line-height:1; letter-spacing:-.04em; font-variant-numeric:tabular-nums;}
+  .reg-desc{font-size:13.5px; color:var(--ink-soft); line-height:1.55;}
+  .reg-desc b{color:var(--ink); font-weight:600;}
+  .reg-stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(104px,1fr)); gap:10px;}
+  .rs{background:var(--bg-soft); border-radius:var(--radius-xs); padding:10px 12px; min-width:0;}
+  .rs .k{font-size:11.5px; color:var(--muted); font-weight:450;}
+  .rs .v{font-size:17px; font-weight:600; margin-top:3px; letter-spacing:-.03em; font-variant-numeric:tabular-nums;}
+
+  /* ---------- per-field cards ---------- */
+  .areas{display:grid; grid-template-columns:repeat(auto-fit,minmax(380px,1fr)); gap:12px;}
+  .areas > *{min-width:0;}
+  .area{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:20px 22px; min-width:0;}
+  .area.risk-high{border-color:var(--red);}
+  .area.risk-watch{border-color:var(--amber);}
+  .area-head{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:16px;}
+  .area-name{font-size:15px; font-weight:600; letter-spacing:-0.02em;}
+  .area-sub{font-size:11.5px; color:var(--muted); margin-top:4px;}
+  .outlook{padding:5px 12px; border-radius:999px; font-size:11.5px; font-weight:600; white-space:nowrap; flex:none;}
+  .outlook.low{background:var(--green-bg); color:var(--green);}
+  .outlook.watch{background:var(--amber-bg); color:var(--amber);}
+  .outlook.high{background:var(--red-bg); color:var(--red);}
+
+  .verdict{font-size:13px; line-height:1.6; color:var(--ink-soft); margin-bottom:16px;}
+  .verdict b{color:var(--ink); font-weight:600;}
+  .verdict .lead{font-size:24px; font-weight:600; color:var(--ink); display:block; margin-bottom:7px; letter-spacing:-.035em;}
+  .area.risk-high .verdict .lead{color:var(--red);}
+  .area.risk-watch .verdict .lead{color:var(--amber);}
+
+  /* ---------- 12-hour rain strip ---------- */
+  .strip{display:grid; grid-template-columns:repeat(12,1fr); gap:4px; margin-bottom:8px;}
+  .hr{text-align:center; min-width:0;}
+  /* A baseline under every hour, so a dry hour reads as a bar sitting on the
+     floor rather than as a missing one. */
+  .hr .bar-box{height:58px; display:flex; align-items:flex-end; justify-content:center;
+    margin-bottom:6px; border-bottom:1px solid var(--line);}
+  .hr .bar{width:100%; background:var(--water); border-radius:3px 3px 0 0; min-height:3px; opacity:.9;}
+  .hr .bar.dry{background:var(--card-border);}
+  .hr .t{font-size:10px; color:var(--muted); font-variant-numeric:tabular-nums;}
+  .hr .mm{font-size:10px; color:var(--ink-soft); font-variant-numeric:tabular-nums; margin-top:1px;}
+  .hr.sat .t{color:var(--red); font-weight:600;}
+  .strip-key{font-size:11.5px; color:var(--muted); margin-bottom:16px;}
+
+  .ground{display:grid; grid-template-columns:repeat(3,1fr); gap:10px;}
+  .g{background:var(--bg-soft); border-radius:var(--radius-xs); padding:10px 12px; min-width:0;}
+  .g .k{font-size:11.5px; color:var(--muted); font-weight:450;}
+  .g .v{font-size:15px; font-weight:600; margin-top:3px; letter-spacing:-.03em; font-variant-numeric:tabular-nums;}
+  .g .v.good{color:var(--green);} .g .v.warn{color:var(--amber);} .g .v.bad{color:var(--red);}
+
+  .why{font-size:11.5px; color:var(--muted); line-height:1.65; margin-top:16px; padding-top:12px; border-top:1px solid var(--line);}
+  .why b{color:var(--ink-soft);}
+
+  .badge{font-size:10.5px; font-weight:600; letter-spacing:.02em;
+    padding:2px 7px; border-radius:999px; vertical-align:2px;}
+  .badge.live{color:var(--green); background:var(--green-bg);}
+  .badge.sim{color:var(--amber); background:var(--amber-bg);}
+
+  .sources{display:grid; grid-template-columns:1fr 1fr; gap:28px; background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:20px 22px;}
+  @media (max-width:720px){ .sources{grid-template-columns:1fr;} }
+  .sources h5{font-size:12.5px; font-weight:600; margin:0 0 9px; display:flex; align-items:center; gap:7px;}
+  .sources h5::before{content:""; width:7px; height:7px; border-radius:50%; background:var(--muted);}
+  .sources h5.a::before{background:var(--accent);} .sources h5.b::before{background:var(--amber);}
+  .sources h5.a{color:var(--ink);} .sources h5.b{color:var(--ink);}
+  .sources ul{margin:0; padding-left:17px;}
+  .sources li{font-size:12.5px; color:var(--ink-soft); line-height:1.75;}
+  .loading{color:var(--muted); font-size:13px; padding:34px; text-align:center;
+    background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius);}
+  /* Storm scenario: the regional feed is replaced, and it says so. */
+  .storm-banner{display:flex; align-items:center; gap:12px; background:var(--card);
+    border:1px solid var(--card-border); border-left:3px solid var(--amber);
+    border-radius:var(--radius-sm); padding:12px 15px; margin-bottom:12px; font-size:12.5px; color:var(--ink-soft);}
+  .storm-banner .sb-tag{font-size:11px; font-weight:600; color:var(--amber); background:var(--amber-bg);
+    border-radius:999px; padding:3px 9px; flex:none;}
+  .storm-banner .sb-text{flex:1;}
+  footer{margin-top:36px; padding-top:16px; border-top:1px solid var(--line); font-size:11.5px; color:var(--muted); line-height:1.65; max-width:90ch;}
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-mark"><svg viewBox="0 0 24 24"><path d="M12 3.5c3.4 3.3 5.2 6 5.2 8.4a5.2 5.2 0 0 1-10.4 0c0-2.4 1.8-5.1 5.2-8.4Z"/><path d="M9.6 12.6a2.6 2.6 0 0 0 2.6 2.6"/></svg></div>
+    <b>FMS Center</b>
+  </div>
+
+  <nav class="sb-nav">
+    <a href="dev.html#overview"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10.5V20h12v-9.5"/></svg>Overview</a>
+    <a href="dev.html#prediction"><svg viewBox="0 0 24 24"><path d="M3 17l5.5-6 4 3.5L21 6"/><path d="M16 6h5v5"/></svg>Prediction</a>
+    <a href="dev.html#nodes"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 10h17M9 10v9"/></svg>Nodes</a>
+    <a href="dev.html#sensors"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>Sensors</a>
+    <a href="dev.html#trends"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V5M16 20v-7M22 20H2"/></svg>Trends</a>
+    <a href="dev.html#activity"><svg viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 13 2.5-7h5"/></svg>Activity</a>
+    <a class="on" href="forecast.html"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.2 7-10.5a7 7 0 1 0-14 0C5 15.8 12 21 12 21Z"/><circle cx="12" cy="10.5" r="2.5"/></svg>Field forecast</a>
+  </nav>
+
+  <div class="sb-foot">
+    <a href="dev.html"><svg viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M7.5 9.5 10 12l-2.5 2.5M12.5 14.5h4"/></svg><span>Dev console</span></a>
+    <button id="theme-toggle" title="Switch light / dark">
+      <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.6M12 18.9v2.6M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M2.5 12h2.6M18.9 12h2.6M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>
+      <span>Appearance</span>
+    </button>
+  </div>
+</aside>
+
+<main class="main">
+
+<div class="page-head">
+  <h1>Field forecast</h1>
+  <div class="head-right">
+    <button class="btn" id="storm-btn">Simulate storm</button>
+    <div class="hpill"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></svg><span id="clock">—</span></div>
+  </div>
+</div>
+
+<div class="section-title">
+  <h2>Regional <span class="badge live" id="reg-badge">live</span></h2>
+  <span id="reg-src">Open-Meteo · 14.53°N, 121.00°E</span>
+</div>
+<div id="storm-banner" hidden></div>
+<div id="regional"><div class="loading">Fetching live weather…</div></div>
+
+<div class="section-title">
+  <h2>By field</h2>
+  <span>same sky, different ground — outlook is per node</span>
+</div>
+<div class="areas" id="areas"></div>
+
+<div class="section-title"><h2>Where each number comes from</h2></div>
+<div class="sources">
+  <div>
+    <h5 class="a">Live</h5>
+    <ul>
+      <li>Regional temperature, humidity</li>
+      <li>Hourly rainfall forecast, 12h</li>
+      <li>Conditions code</li>
+    </ul>
+  </div>
+  <div>
+    <h5 class="b">Simulated</h5>
+    <ul>
+      <li>All node soil and water readings</li>
+      <li>Per-field outlook derived from them</li>
+      <li>Hardware is built but not yet logging</li>
+    </ul>
+  </div>
+</div>
+
+<footer>
+  Regional weather is live from open-meteo.com. Node readings are simulated within
+  the ranges measured on our own bench (dry ≈875, saturated ≈385 raw ADC). The
+  per-field outlook is a model, not a validated forecast.
+</footer>
+
+</main>
+<script>
+/* =========================================================================
+   Thresholds from the Sensor Findings Brief, 2026-09-17.
+   ========================================================================= */
+const SOIL_DRY_MEAN = 875.0, SOIL_SAT_MEAN = 385.4;
+const SOIL_FLOOD_THRESHOLD = 436;   // saturated
+const SOIL_WATCH_THRESHOLD = 551;   // wetter than ideal
+const SOIL_HEALTHY_FLOOR = 552, SOIL_HEALTHY_CEIL = 699;
+const SOIL_DRYING_CEIL = 828;
+const WATER_FLOOD_THRESHOLD = 30;
+const RAIN_WET_MM = 0.2;
+
+const ZONES = [
+  {max:SOIL_FLOOD_THRESHOLD, label:"Saturated",         cls:"bad"},
+  {max:SOIL_WATCH_THRESHOLD, label:"Wetter than ideal", cls:"warn"},
+  {max:SOIL_HEALTHY_CEIL,    label:"Healthy",           cls:"good"},
+  {max:SOIL_DRYING_CEIL,     label:"Drying out",        cls:"warn"},
+  {max:959,                  label:"Critically dry",    cls:"bad"},
+  {max:Infinity,             label:"Probe out of soil", cls:"bad"}
+];
+const zoneOf = raw => ZONES.find(z => raw <= z.max);
+
+const BASE = {lat:14.5333, lon:121.0000};
+
+/* Three fields, deliberately in different ground states so the same
+   regional forecast produces three different outlooks — which is the
+   entire point of measuring per field rather than per region. */
+const FIELDS = [
+  {id:"1", name:"North Rice Paddy", area:"North block", soil:661, water:0,
+   drainage:"good",  note:"raised bund, drains to the north ditch",
+   behaviour:"steady", target:661, lastRead:Date.now()},
+  {id:"2", name:"East Canal Field", area:"Canal side",  soil:470, water:12,
+   drainage:"poor",  note:"lowest block, backs onto the canal",
+   behaviour:"wetting", target:430, lastRead:Date.now()},
+  {id:"3", name:"Riverside Plot",   area:"River flat",  soil:812, water:0,
+   drainage:"fair",  note:"sandy, dries fastest of the three",
+   behaviour:"drying", target:880, lastRead:Date.now()}
+];
+
+/* Readings tick like the console's so the page is live rather than a
+   snapshot. Values stay inside the brief's measured envelope and carry
+   its ~5% inter-reading wobble, which is why the cards jitter slightly
+   instead of moving smoothly -- that is what the probe actually does. */
+const READ_INTERVAL_MS = 4000;
+const noise = n => (Math.random()-0.5)*n;
+
+function stepFields(){
+  FIELDS.forEach(f=>{
+    if (f.behaviour === "wetting"){
+      f.soil += (f.target - f.soil)*0.10 + noise(11);
+      if (f.soil <= SOIL_FLOOD_THRESHOLD) f.water += 2 + noise(3);
+      if (f.soil < 415){ f.behaviour = "drying"; f.target = 620; }
+    } else if (f.behaviour === "drying"){
+      f.soil += (f.target - f.soil)*0.07 + noise(11);
+      f.water = Math.max(0, f.water - 1.5);
+      if (f.soil > f.target - 12){ f.behaviour = "steady"; f.target = f.soil; }
+    } else {
+      f.soil += noise(14);
+      if (Math.random() < 0.06){ f.behaviour = "wetting"; f.target = f.soil - 180; }
+    }
+    f.soil  = Math.max(335, Math.min(1023, f.soil));
+    f.water = Math.max(0, Math.min(260, f.water));
+    if (f.water < 3) f.water = 0;
+    f.lastRead = Date.now();
+  });
+}
+
+/* How fast each field takes on water per mm of rain, in raw ADC. This is a
+   modelled figure, not measured — no wetting event has been logged yet.
+   Drainage scales it: a poorly-drained block holds what falls on it. */
+const WETTING_ADC_PER_MM = {good: 5, fair: 7, poor: 11};
+const DRYBACK_ADC_PER_H  = {good: 9, fair: 12, poor: 5};
+
+const WMO = {0:"Clear sky",1:"Mainly clear",2:"Partly cloudy",3:"Overcast",45:"Fog",48:"Rime fog",
+ 51:"Light drizzle",53:"Moderate drizzle",55:"Dense drizzle",61:"Slight rain",63:"Moderate rain",
+ 65:"Heavy rain",66:"Freezing rain",67:"Heavy freezing rain",71:"Slight snow",80:"Slight showers",
+ 81:"Moderate showers",82:"Violent showers",95:"Thunderstorm",96:"Thunderstorm with hail",99:"Severe thunderstorm"};
+
+let wx = null, liveHours = null, stormOn = false;
+
+/* A 12-hour storm profile, used to show what the fields do under rain the
+   real forecast is not offering today. Only the regional rainfall figures
+   are replaced; the ground state and the model are untouched. The banner
+   stays up the whole time it is active. */
+const STORM_HOURS = [1.2, 3.5, 7.0, 9.5, 8.0, 5.5, 3.0, 1.5, 0.4, 0, 0, 0];
+
+function fmtH(h){
+  if (h === null) return "—";
+  if (h <= 0) return "now";
+  if (h < 1) return `${Math.round(h*60)} min`;
+  return `${h.toFixed(h < 10 ? 1 : 0)} h`;
+}
+
+/* Walk the next 12 forecast hours, wetting each field by the rain that
+   actually falls on it and drying it back in the hours that stay dry. */
+function projectField(f, hours){
+  const perMM = WETTING_ADC_PER_MM[f.drainage];
+  const dryback = DRYBACK_ADC_PER_H[f.drainage];
+  let soil = f.soil, water = f.water;
+  let satAt = null, floodAt = null;
+  const path = [];
+  hours.forEach((mm, i) => {
+    if (mm >= RAIN_WET_MM){
+      soil = Math.max(SOIL_SAT_MEAN - 50, soil - mm*perMM);
+      if (soil <= SOIL_FLOOD_THRESHOLD) water += mm * (f.drainage === "poor" ? 9 : 4);
+    } else {
+      soil = Math.min(1023, soil + dryback);
+      water = Math.max(0, water - (f.drainage === "poor" ? 3 : 8));
+    }
+    if (satAt === null && soil <= SOIL_FLOOD_THRESHOLD) satAt = i + 1;
+    if (floodAt === null && water > WATER_FLOOD_THRESHOLD) floodAt = i + 1;
+    path.push({h:i+1, mm, soil:Math.round(soil), water:Math.round(water),
+               sat: soil <= SOIL_FLOOD_THRESHOLD});
+  });
+  return {path, satAt, floodAt, endSoil:Math.round(soil), endWater:Math.round(water)};
+}
+
+function outlookFor(f, proj, total12){
+  if (Math.round(f.water) > WATER_FLOOD_THRESHOLD) return {key:"high", label:"Flooding now"};
+  if (proj.floodAt !== null && proj.floodAt <= 6) return {key:"high", label:"Flood likely"};
+  if (proj.floodAt !== null) return {key:"watch", label:"Flood possible"};
+  if (proj.satAt !== null) return {key:"watch", label:"Saturation likely"};
+  if (total12 >= 10) return {key:"watch", label:"Heavy rain, ground holding"};
+  return {key:"low", label:"Low risk"};
+}
+
+function renderRegional(){
+  const c = wx.current;
+  const next12 = wx.hours.slice(0,12).reduce((a,b)=>a+b,0);
+  const next6  = wx.hours.slice(0,6).reduce((a,b)=>a+b,0);
+  document.getElementById("regional").innerHTML = `
+    <div class="regional">
+      <div class="reg-now">
+        <div class="reg-temp">${Math.round(c.temperature_2m)}°</div>
+        <div class="reg-desc">
+          <b>${WMO[c.weather_code] ?? "Unknown"}</b><br>
+          ${next12 >= 1 ? `${next12.toFixed(1)}mm expected over 12 hours` : "Little to no rain expected"}
+        </div>
+      </div>
+      <div class="reg-stats">
+        <div class="rs"><div class="k">Humidity</div><div class="v">${c.relative_humidity_2m}%</div></div>
+        <div class="rs"><div class="k">Rain now</div><div class="v">${(c.precipitation ?? 0).toFixed(1)}mm</div></div>
+        <div class="rs"><div class="k">Next 6h</div><div class="v">${next6.toFixed(1)}mm</div></div>
+        <div class="rs"><div class="k">Next 12h</div><div class="v">${next12.toFixed(1)}mm</div></div>
+        <div class="rs"><div class="k">Fields</div><div class="v">${FIELDS.length}</div></div>
+      </div>
+    </div>`;
+}
+
+function renderAreas(){
+  const haveWx = !!wx;
+  const hours = haveWx ? wx.hours.slice(0,12) : new Array(12).fill(0);
+  const total12 = hours.reduce((a,b)=>a+b,0);
+  const peak = Math.max(...hours, 1);
+  const now = new Date();
+
+  document.getElementById("areas").innerHTML = FIELDS.map(f=>{
+    const proj = projectField({...f, soil:Math.round(f.soil), water:Math.round(f.water)}, hours);
+    const ol = haveWx ? outlookFor(f, proj, total12) : {key:"low", label:"No forecast"};
+    const soilR = Math.round(f.soil), waterR = Math.round(f.water);
+    const z = zoneOf(soilR);
+
+    const lead = !haveWx ? `${soilR}` : waterR > WATER_FLOOD_THRESHOLD ? "Flooding"
+               : proj.floodAt !== null ? fmtH(proj.floodAt)
+               : proj.satAt !== null ? fmtH(proj.satAt)
+               : "Clear 12h";
+
+    let body;
+    if (!haveWx){
+      body = `Ground state only — no rainfall forecast available, so no outlook is projected for <b>${f.area.toLowerCase()}</b>.`;
+    } else if (waterR > WATER_FLOOD_THRESHOLD){
+      body = `Standing water in <b>${f.area}</b> now. ${f.note}.`;
+    } else if (proj.floodAt !== null){
+      body = `On the forecast rain, <b>${f.area}</b> reaches standing water in about <b>${fmtH(proj.floodAt)}</b>. Ground is ${z.label.toLowerCase()} and drainage here is ${f.drainage}.`;
+    } else if (proj.satAt !== null){
+      body = `<b>${f.area}</b> saturates in about <b>${fmtH(proj.satAt)}</b> but doesn't reach standing water inside 12 hours.`;
+    } else if (total12 >= 10){
+      body = `<b>${total12.toFixed(0)}mm</b> forecast, but ${f.area.toLowerCase()} starts ${z.label.toLowerCase()} with ${f.drainage} drainage — it should absorb this.`;
+    } else {
+      body = `Nothing expected to trouble <b>${f.area.toLowerCase()}</b> in the next 12 hours.`;
+    }
+
+    const strip = proj.path.map((p,i)=>{
+      const t = new Date(now.getTime() + (i+1)*3600e3);
+      const h = Math.max(2, Math.round(p.mm/peak*52));
+      return `<div class="hr ${p.sat?'sat':''}">
+        <div class="bar-box"><div class="bar ${p.mm<RAIN_WET_MM?'dry':''}" style="height:${h}px"></div></div>
+        <div class="t">${t.getHours().toString().padStart(2,'0')}</div>
+        <div class="mm">${p.mm>=0.1?p.mm.toFixed(1):'·'}</div>
+      </div>`;
+    }).join("");
+
+    return `
+      <div class="area risk-${ol.key}">
+        <div class="area-head">
+          <div>
+            <div class="area-name">${f.name}</div>
+            <div class="area-sub">${f.area} · drainage ${f.drainage} · <span style="color:var(--green)" data-age="${f.lastRead}">reading 0s ago</span></div>
+          </div>
+          <span class="outlook ${ol.key}">${ol.label}</span>
+        </div>
+        <div class="verdict"><span class="lead">${lead}</span>${body}</div>
+        ${haveWx ? `<div class="strip">${strip}</div>
+        <div class="strip-key">Hourly rainfall, mm · red hour = soil projected at or past ${SOIL_FLOOD_THRESHOLD}</div>` :
+        `<div class="strip-key" style="padding:10px 0 14px;">Rainfall forecast unavailable — showing ground state only.</div>`}
+        <div class="ground">
+          <div class="g"><div class="k">Soil now</div><div class="v ${z.cls}">${soilR}</div></div>
+          <div class="g"><div class="k">Condition</div><div class="v ${z.cls}" style="font-size:11px;">${z.label}</div></div>
+          <div class="g"><div class="k">Water</div><div class="v ${waterR>WATER_FLOOD_THRESHOLD?'bad':''}">${waterR}</div></div>
+        </div>
+        <div class="why"><b>Why this differs from the regional forecast:</b> ${f.note}. Same rain, but this block starts at ${soilR} raw and sheds water ${f.drainage === "poor" ? "slowly" : f.drainage === "fair" ? "moderately" : "well"}, so it responds differently to the hours above.</div>
+      </div>`;
+  }).join("");
+}
+
+async function load(){
+  renderAreas();          // ground state stands alone — never wait on weather
+  try{
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${BASE.lat}&longitude=${BASE.lon}`
+      + `&current=temperature_2m,precipitation,weather_code,relative_humidity_2m`
+      + `&hourly=precipitation&forecast_hours=13&timezone=Asia%2FManila`;
+    const ctl = new AbortController();
+    const bail = setTimeout(()=>ctl.abort(), 8000);
+    const res = await fetch(url, {signal: ctl.signal});
+    clearTimeout(bail);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const d = await res.json();
+    liveHours = (d.hourly.precipitation || []).slice(0,12);
+    wx = {current: d.current, hours: stormOn ? STORM_HOURS.slice() : liveHours.slice()};
+    renderRegional(); renderAreas();
+  } catch(e){
+    document.getElementById("regional").innerHTML =
+      `<div class="loading">Couldn't reach api.open-meteo.com — this page needs internet for the regional feed.
+       <button class="btn" id="retry" style="margin-left:8px;">Retry</button></div>`;
+    document.getElementById("retry").addEventListener("click", load);
+    renderAreas();   // ground readings stand on their own
+  }
+}
+
+document.getElementById("storm-btn").addEventListener("click", ()=>{
+  if (!wx) return;
+  stormOn = !stormOn;
+  wx.hours = stormOn ? STORM_HOURS.slice() : (liveHours || []).slice();
+  const b = document.getElementById("storm-banner");
+  b.hidden = !stormOn;
+  b.className = stormOn ? "storm-banner" : "";
+  b.innerHTML = stormOn
+    ? `<span class="sb-tag">Simulated</span><span class="sb-text">Regional rainfall replaced with a storm profile — ${STORM_HOURS.reduce((a,c)=>a+c,0).toFixed(1)}mm over 12h. Ground readings and the model are unchanged.</span>`
+    : "";
+  document.getElementById("storm-btn").textContent = stormOn ? "Back to live" : "Simulate storm";
+  document.getElementById("reg-src").textContent = stormOn
+    ? "Simulated storm profile" : "Open-Meteo · 14.53°N, 121.00°E";
+  // The badge must not keep saying "live" while the feed is substituted.
+  const rb = document.getElementById("reg-badge");
+  rb.textContent = stormOn ? "simulated" : "live";
+  rb.className = stormOn ? "badge sim" : "badge live";
+  renderRegional(); renderAreas();
+});
+
+document.getElementById("theme-toggle").addEventListener("click", ()=>{
+  const cur = document.documentElement.getAttribute("data-theme");
+  const next = cur === "dark" ? "light" : cur === "light" ? "dark"
+    : (matchMedia("(prefers-color-scheme: dark)").matches ? "light" : "dark");
+  document.documentElement.setAttribute("data-theme", next);
+  try{ localStorage.setItem("fms-theme", next); }catch(e){}
+});
+try{ const t = localStorage.getItem("fms-theme"); if (t) document.documentElement.setAttribute("data-theme", t); }catch(e){}
+
+setInterval(()=>{ document.getElementById("clock").textContent = new Date().toLocaleTimeString([], {hour12:false}); }, 1000);
+document.getElementById("clock").textContent = new Date().toLocaleTimeString([], {hour12:false});
+load();
+setInterval(()=>{ stepFields(); renderAreas(); }, READ_INTERVAL_MS);
+// the age counter ticks every second so the page is visibly alive between reads
+setInterval(()=>{
+  document.querySelectorAll("[data-age]").forEach(el=>{
+    el.textContent = `reading ${Math.round((Date.now() - Number(el.dataset.age))/1000)}s ago`;
+  });
+}, 1000);
+</script>
+</body>
+</html>

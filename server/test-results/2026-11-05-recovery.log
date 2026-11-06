@@ -1,0 +1,44 @@
+Base Module Starting...
+SIM module: connecting (up to 15 s while it boots)...
+==== FMS BASE STATION (packet v2) ====
+node OFFLINE after 10 s (if it sends every ~2 s) or 10 min (every ~10 s)
+flood SMS max 1/hour | low-battery SMS OFF | STATUS texts OFF
+alert rule: water > 30 or soil <= 436, held 3 readings; clears at soil > 470 and water <= 30
+risk levels ON (display only): NORMAL / WATCH / WARNING / FLOOD, ThingSpeak field8
+ThingSpeak uploads ON
+map location: provisioned SITE_LAT_LONG
+SIM module: OK | SIM card ready | signal 15/31 good | network registered
+WARNING: API_KEY_NODE_2 is a placeholder - node 2 uploads will fail
+WARNING: API_KEY_NODE_3 is a placeholder - node 3 uploads will fail
+COMMANDS  n node table | m modem status | t test cellular | v duplicates | h help
+Listening for nodes...
+NODE 1 | hops 0 | soil 1007 | water 9 | rain NONE | batt 26% discharging | risk NORMAL
+NODE 1 power | 3.76V | 10-min avg -26mA | est. 22.0h left
+HTTP APN setup failed: no reply
+SIM module stopped answering - will look for it every 60 s
+NODE 1 | hops 0 | soil 345 | water 17 | rain NONE | batt 27% discharging | risk WARNING  << WATCHING 1/3
+NODE 1 | hops 0 | soil 345 | water 11 | rain NONE | batt 28% discharging | risk WARNING  << WATCHING 2/3
+NODE 1 power | 3.76V | 10-min avg -26mA | est. 23.6h left
+NODE 1 | hops 0 | soil 349 | water 11 | rain NONE | batt 29% discharging | risk WARNING  << FLOOD LEVEL
+>>> FLOOD ALERT: sending SMS for NODE 1
+SMS suppressed for cellular bench test
+>>> FLOOD ALERT SMS FAILED - retrying every 60 s while the flood lasts (m = modem status)
+NODE 1 | hops 0 | soil 353 | water 12 | rain NONE | batt 30% discharging | risk WARNING  << FLOOD LEVEL
+NODE 1 power | 3.77V | 10-min avg -22mA | est. 30.0h left
+    (flood SMS failed earlier - retrying within 60 s)
+NODE 1 | hops 0 | soil 373 | water 11 | rain NONE | batt 29% discharging | risk WARNING  << FLOOD LEVEL
+NODE 1 | hops 0 | soil 350 | water 12 | rain NONE | batt 20% discharging LOW | risk WARNING  << FLOOD LEVEL
+NODE 1 | hops 0 | soil 355 | water 12 | rain NONE | batt 19% discharging LOW | risk WARNING  << FLOOD LEVEL
+NODE 1 | hops 0 | soil 358 | water 12 | rain NONE | batt 16% discharging LOW | risk WARNING  << FLOOD LEVEL
+>>> FLOOD ALERT: sending SMS for NODE 1
+SMS suppressed for cellular bench test
+>>> FLOOD ALERT SMS FAILED - retrying every 60 s while the flood lasts (m = modem status)
+NODE 1 | hops 0 | soil 362 | water 12 | rain NONE | batt 19% discharging LOW | risk WARNING  << FLOOD LEVEL
+NODE 1 | hops 0 | soil 366 | water 12 | rain NONE | batt 18% discharging LOW | risk WARNING  << FLOOD LEVEL
+NODE 1 | hops 0 | soil 369 | water 12 | rain NONE | batt 18% discharging LOW | risk WARNING  << FLOOD LEVEL
+NODE 1 power | 3.72V | 10-min avg -23mA | est. 17.2h left
+    (flood SMS failed earlier - retrying within 60 s)
+NODE 1 | hops 0 | soil 373 | water 13 | rain NONE | batt 18% discharging LOW | risk WARNING  << FLOOD LEVEL
+>>> FLOOD ALERT: sending SMS for NODE 1
+SMS suppressed for cellular bench test
+>>> FLOOD ALERT SMS FAILED - retrying every 60 s while the flood lasts (m = modem status)

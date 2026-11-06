@@ -1,0 +1,24 @@
+Base Module Starting...
+SIM module: connecting (up to 15 s while it boots)...
+==== FMS BASE STATION (packet v2) ====
+node OFFLINE after 10 s (if it sends every ~2 s) or 10 min (every ~10 s)
+flood SMS max 1/hour | low-battery SMS OFF | STATUS texts OFF
+alert rule: water > 30 or soil <= 436, held 3 readings; clears at soil > 470 and water <= 30
+risk levels ON (display only): NORMAL / WATCH / WARNING / FLOOD, ThingSpeak field8
+ThingSpeak uploads ON
+map location: provisioned SITE_LAT_LONG
+SIM module: OK | SIM card ready | signal 16/31 good | network registered
+WARNING: API_KEY_NODE_2 is a placeholder - node 2 uploads will fail
+WARNING: API_KEY_NODE_3 is a placeholder - node 3 uploads will fail
+COMMANDS  n node table | m modem status | t test cellular | v duplicates | h help
+Listening for nodes...
+NODE 1 | hops 0 | soil 766 | water 7 | rain NONE | batt 20% discharging LOW | risk NORMAL
+NODE 1 power | 3.73V | 10-min avg -23mA | est. 19.1h left
+    ThingSpeak NODE 1: uploaded
+NODE 1 OFFLINE (nothing for 10 s)
+NODE 1 | hops 0 | soil 770 | water 6 | rain NONE | batt 19% discharging LOW | risk NORMAL
+NODE 1 BACK ONLINE
+    ThingSpeak NODE 1: uploaded
+test: GET http://sometimes-advisory-glance-ste.trycloudflare.com/health
+test: OK - reached the server over cellular
+NODE 1 | hops 0 | soil 781 | water 7 | rain NONE | batt 20% discharging LOW | risk NORMAL

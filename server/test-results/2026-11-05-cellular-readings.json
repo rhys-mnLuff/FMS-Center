@@ -1,0 +1,32 @@
+[
+  {
+    "id": 56,
+    "node": 1,
+    "ts": 1793883152362,
+    "soil": 766,
+    "water": 7,
+    "health": 8,
+    "rain": 1007,
+    "batt_pct": 20,
+    "batt_mv": 3728,
+    "batt_ma": -23,
+    "risk": 0,
+    "lat": 14.5333,
+    "lon": 121.0
+  },
+  {
+    "id": 57,
+    "node": 1,
+    "ts": 1793883183240,
+    "soil": 770,
+    "water": 6,
+    "health": 7,
+    "rain": 1007,
+    "batt_pct": 19,
+    "batt_mv": 3727,
+    "batt_ma": -23,
+    "risk": 0,
+    "lat": 14.5333,
+    "lon": 121.0
+  }
+]

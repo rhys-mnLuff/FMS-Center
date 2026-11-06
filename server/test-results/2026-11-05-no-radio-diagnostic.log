@@ -1,0 +1,20 @@
+Base Module Starting...
+SIM module: connecting (up to 15 s while it boots)...
+==== FMS BASE STATION (packet v2) ====
+node OFFLINE after 10 s (if it sends every ~2 s) or 10 min (every ~10 s)
+flood SMS max 1/hour | low-battery SMS OFF | STATUS texts OFF
+alert rule: water > 30 or soil <= 436, held 3 readings; clears at soil > 470 and water <= 30
+risk levels ON (display only): NORMAL / WATCH / WARNING / FLOOD, ThingSpeak field8
+ThingSpeak uploads ON
+map location: provisioned SITE_LAT_LONG
+SIM module: OK | SIM card ready | signal 15/31 good | network registered
+WARNING: API_KEY_NODE_2 is a placeholder - node 2 uploads will fail
+WARNING: API_KEY_NODE_3 is a placeholder - node 3 uploads will fail
+COMMANDS  n node table | m modem status | t test cellular | v duplicates | h help
+Listening for nodes...
+no nodes heard yet
+packets ok 0 | duplicates 0 | bad 0 | forced-relay ignored 0 | free RAM 774 B
+SIM module: OK | SIM card ready | signal 16/31 good | network registered
+test: GET https://fms-field-console.bakedhazelnut.chatgpt.site/health
+TLS: loading trusted root certificate
+test: OK - reached the server over cellular

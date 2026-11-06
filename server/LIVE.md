@@ -1,200 +1,188 @@
-# Getting live cellular readings onto the dashboard
+# Cellular dashboard path
 
-Status as of 2026-11-05: **no cellular reading has ever arrived.** The modem
-registers on the network and then fails on the first transmit. The 26 readings
-in `fms.db` all came over USB via `serial_bridge.py` on 23 October.
+Updated 5 November 2026 (Manila).
 
----
+## Longer-run failure and latest diagnosis
 
-## 1. The blocker is power, and no software change fixes it
+The short wall-power test passed, but subsequent checks found the feed stopped
+at **21 readings**, last received **21:58:10 Manila time**. Do not treat the
+short run as proof of reliable unattended operation.
 
-The base station boots, finds the SIM, and registers — `AT+CPIN: READY`,
-`+CSQ: 13–17/31`, `+CREG: 1`. Then the first `AT+HTTPACTION=0` kills it.
+On reconnecting the base to USB, it reported **zero radio packets**, including
+zero malformed packets, while the modem was registered at **16/31 signal**.
+The identified firmware's `t` command successfully reached the hosted `/health`
+endpoint over HTTPS without writing a sensor reading. Thus cellular and the
+server worked during this diagnostic, while the base heard no sensor node.
+The next check is restarting/inspecting the sensor and its radio/sleep behavior.
+No new firmware was flashed during this diagnostic.
 
-That pattern is a supply collapse, not a firmware fault. The modem draws
-roughly **2A in bursts of a few milliseconds** when the transmitter keys up.
-A standard USB-A port is specified for 0.5A (USB 2.0) or 0.9A (USB 3.0);
-some Mac ports give more, but raw amperage is only half the problem — a
-supply several feet down a USB cable cannot answer a millisecond transient
-no matter how it is rated. The voltage dips, the board browns out, and the
-upload never completes. That is why the capacitor below matters as much as
-the supply: it is what actually sources the burst.
+## Hosted standalone trial (later on 5 November)
 
-`HARDWARE.md` already records this, twice:
+The dashboard and a persistent D1 database are published at
+https://fms-field-console.bakedhazelnut.chatgpt.site through the Sites plugin.
+Anonymous reads and key-protected ingestion are enabled. A new secret Node 1
+write key is configured in the hosting environment and in the ignored local
+`FmsDeployment.h`; it is not part of the website source. Nodes 2/3 still need
+separate provisioned keys before they can upload.
 
-> Needs its own 3.7–4.2V supply with a large (~1000µF) capacitor — pulling
-> power from the Arduino's 5V pin causes brownouts under the module's burst
-> current draw, **which looks exactly like a firmware bug**
+The base currently has the repository's web-upload firmware installed,
+configured for HTTPS, TLS 1.2, SNI and validation against Google's GTS Root R4.
+The public CA certificate is embedded in program flash and downloaded to the
+modem automatically, without the laptop. Certificate validation is enabled;
+valid modem time is required. The configured HTTPS path has now delivered real data to the hosted database.
+On the wall-power test, USB disappeared from the laptop and the base generated
+a new session ID (`1815153`). The first record from that boot arrived at
+21:50:28 Manila time after a startup/recovery delay of roughly three minutes.
+At least 10 records arrived over the following 367 seconds, with most gaps
+around 31 seconds and the longest observed gap 83 seconds. The laptop USB bridge
+was stopped, and the hosted database is independent of the local server.
 
-> Resets or LED dies during send → Power brownout (the classic) → Own supply,
-> 1000µF cap; never the Arduino 5V pin
+This passes the observed standalone connectivity check, not a guarantee of
+uninterrupted cellular coverage or calibrated flood measurements. Keep the base
+on its 5V USB wall charger, the SIM/data plan active, and sensor nodes powered.
+The soil probe is still reporting in its fault/out-of-soil band. Battery readings
+and all physical thresholds still need calibration before field reliance.
 
-**What to change before testing again:**
+This build has SMS disabled and does not include the original Nov firmware's
+calls, clock display, saved state or sync-beacon implementation. The original
+flash backup remains available. Firmware uses stable sample IDs for retry
+deduplication and sends the age of the base's last radio reading. The hosted
+server retains both estimated reading time and receipt time. The estimate
+includes radio-to-base age; it is not a synchronized clock inside the sensor.
 
-1. Power the modem from its **own** 3.7–4.2V source — a 18650 cell, a LiPo, or
-   a bench supply set to 4.0V. Not the Arduino's 5V pin, and not USB.
-2. Put a **1000µF electrolytic across the modem's VCC and GND**, physically
-   close to the module. This is what actually survives the burst; the supply's
-   average current rating is not the whole problem.
-3. **Common ground** between that supply and the Arduino, or the serial link
-   between them will not work.
-4. Keep USB connected for the serial log only.
+The dashboard starts in live mode. It uses same-origin `/feed`; `?mode=demo`
+explicitly selects simulation. Live mode hides simulation controls, shows
+missing battery/rain/probe values as unavailable, and does not invent cellular
+signal strength, upload percentages or SMS delivery receipts. Timestamps keep
+aging even when no new records arrive. Sensor calibration remains provisional.
 
-If it still dies after that, the next suspect is the supply's own sag under
-load — test with a meter on the modem's VCC during a send, not at the supply.
+Local tests passed for authorization rejection, invalid readings, signed current,
+record storage, duplicate retries and reading age. The hosted `/health` and
+empty `/feed` respond successfully with the `FMS-Base/1.0` client identifier.
+Generic Python user-agent requests were rejected at the hosting edge, so device
+HTTP setup includes an explicit FMS user agent. Production has no synthetic
+sensor records.
 
----
+Build the configured firmware by copying `Base_Code.ino` and the private header
+into an Arduino sketch directory and compiling with `arduino:avr:nano` and
+`--build-property compiler.cpp.extra_flags=-DFMS_DEPLOYMENT_CONFIG`. Do not use
+the legacy flashing scripts for this configured HTTPS deployment.
 
-## 2. The second blocker: the endpoint does not survive a restart
+## What has actually been proved
 
-`Base_Code.ino` has the server hostname compiled in:
+The connected base uses an ATmega328P Nano and a modem identifying itself as
+**A7670G-LABE**, firmware **A110B06A7670M7**. The older references to SIM7600
+in the sketch are variable names and historical assumptions, not identification
+of the tested modem.
 
-```c
-const char SERVER_HOST[] = "generations-unix-come-cartridges.trycloudflare.com";
-```
+The installed Nov 2026 firmware announced `ThingSpeak OFF`. Its binary backup
+has HTTPTERM but no HTTP uploader commands. The editable repository sketch is a
+different version. Do not assume flashing it preserves the Nov firmware's
+calls, network clock, saved state or radio sync beacon.
 
-That is a Cloudflare **quick tunnel**. Quick tunnels get a new random hostname
-every launch and the old one is gone for good. That hostname has been dead
-since the tunnel was last stopped. So even with power fixed, the system cannot
-"continuously update" anything: each restart needs a source edit, a recompile
-and a reflash.
+With explicit approval, a temporary build of the repository sketch was tested
+against a public Cloudflare tunnel to this ingest server. Outgoing SMS was
+suppressed in that build, and the USB serial bridge was stopped throughout.
 
-Two ways out.
+The corrected build delivered **two real Node 1 readings**, stored as database
+rows **56 and 57**, approximately 31 seconds apart. It also completed a cellular
+GET `/health`. These are cellular deliveries, not USB bridge deliveries or
+synthetic sensor packets. A later upload stalled, so these successes establish
+viability, not continuous field reliability. Stage logging then captured modem error **713 (DNS lookup failed)** and
+**714 (socket connection failed)**. An explicit, nonpersistent DNS test was
+inconclusive because the modem stopped replying during APN setup. A subsequent
+recovery test continued hearing sensor packets but did not deliver more uploads.
 
-### Step 0 — does the modem transmit at all?
+USB currently supplies power. No supply voltage was measured under load.
+Intermittent lost responses and startup messages do not by themselves establish
+a power fault. Do not prescribe a voltage for an unidentified carrier board:
+its power input may differ from the bare modem's VBAT requirements.
 
-Answer this before touching hosting. It needs no tunnel, no server and no
-domain.
+## Firmware changes
 
-```bash
-./server/check_cellular.sh
-```
+`Base_Code.ino` now waits for acknowledgments of APN setup, HTTPINIT and URL
+configuration instead of blindly waiting 0.5 seconds for HTTP initialization.
+The A76XX manual allows HTTPINIT up to 120 seconds and APN configuration up to
+9 seconds. See [SIMCom A76XX command manual](https://files.waveshare.com/wiki/A7670E-Cat-1-GNSS-HAT/A76XX_Series_AT_Command_Manual_V1.09.pdf). HTTPACTION is asynchronous;
+the sketch waits for its result before ending the HTTP session.
 
-It flashes the firmware pointed at a plain-HTTP host that is always up,
-drives the new `t` command over serial, and classifies the result: cellular
-works / no data connection / resetting / modem not responding / SIM / network.
-The sketch's own `SERVER_HOST` is restored afterwards.
+Setup timeouts now trigger the existing modem recovery path; a one-attempt
+baud recovery checks for an answer after changing the boot baud. Failure messages
+distinguish DNS and socket errors from a server rejection.
 
-**Why a separate test.** Uploads are packet-driven — `sendToThingSpeak()` only
-runs when a sensor node's reading arrives over the HC-12. So with the base
-station alone, "the modem cannot transmit" and "no node is sending" produce
-the same symptom: silence. The `t` command fetches `/health` over cellular
-instead, which needs no sensor node and writes nothing, so it can be repeated
-without putting readings in the series that no probe ever took.
+A failed upload retains the latest reading in RAM for another attempt. Attempts
+are paced from completion. This is not a durable queue: intermediate readings
+may be replaced by newer ones and RAM is lost on reset. Long modem waits also
+prevent this SoftwareSerial design from simultaneously receiving radio packets.
+The server timestamps receipt, not the sensor's sampling time.
 
-Type `t` into the serial monitor any time:
+The startup offline timeout now defaults to normal operation. The old 10-second
+demo default falsely marked a node offline before its next 30-second packet.
+After packets arrive, the existing interval learning still applies.
 
-```
-test: GET http://<SERVER_HOST>/health
-test: OK - reached the server over cellular
-```
+## How permanent operation will work
 
-**Reading the result.** The test host has no `/health`, so it answers 404 —
-and that is the proof we want. Only a real web server that received the
-request can produce a 404. A DNS failure, a dead data connection or a
-brownout cannot fake one.
+Sensor → HC-12 radio → base → cellular data → permanent ingest server/database
+→ dashboard polling `/feed`.
 
-| Result | Means |
-|---|---|
-| `test: OK` | Power, SIM, registration, APN and DNS all fine |
-| `FAILED (HTTP 6xx)` | Modem-level error — request never left. APN or data plan |
-| Board reboots mid-test | Supply collapse. Section 1 |
-| `SIM module: NOT RESPONDING` | Modem unpowered or miswired |
+A domain is a stable name; it does not supply an always-running server. The
+permanent deployment must serve the ingestion API and dashboard, retain the
+database, and restart the process after failures. The laptop is only part of
+the temporary tunnel test. A tunnel hostname can disappear when the tunnel
+stops and must not be treated as a permanent firmware configuration.
 
-### Short term — `server/go_live.sh`
+Current routes:
 
-Does the whole loop in one command: starts the ingest server, opens a tunnel,
-reads the new hostname, verifies it reaches the server from outside, patches
-`SERVER_HOST`, recompiles, flashes, then waits for the first reading.
+- `/update`: authenticated sensor ingestion using per-node write keys
+- `/feed`: JSON readings for the dashboard
+- `/health`: server liveness and reading freshness
+- `/dev.html`: dashboard
+- `/forecast.html`: field view
 
-```bash
-./server/go_live.sh                 # full run
-./server/go_live.sh --no-flash      # just the tunnel + patch
-./server/go_live.sh --port /dev/cu.usbserial-1130
-```
+Set `SERVER_HOST` and `SERVER_PATH` to the permanent deployment, then rebuild
+and test. The currently tested uploader uses plain HTTP. HTTPS/TLS on this
+specific modem revision has not yet been validated. Protect ingestion keys
+in deployment and replace the public/placeholder keys before field use.
 
-This makes the tunnel *usable*, not permanent. It still dies with the laptop.
+## Tools and restoration
 
-### Long term — a host that stays up
+- `firmware/CellularDiagnostic/CellularDiagnostic.ino`: temporary USB-to-modem
+  diagnostic, USB 115200, modem D10/D11 at 9600; no sensor forwarding, SMS or calls.
+- `firmware/pre-cellular-test-2026-11-05.hex`: flash backup taken before testing.
+- `firmware/invalid-eeprom-dump-2026-11-05.hex`: **NOT an EEPROM backup**.
+  The bootloader returned the first flash KB for EEPROM reads. An attempted
+  EEPROM restoration failed verification and altered flash; the original flash
+  was reapplied afterward. EEPROM settings cannot be independently verified
+  from this dump. Do not use this file for restoration.
+- `firmware/board-backup-2026-11-05.hex`: earlier original firmware backup.
 
-The firmware points at one hostname forever, the laptop stops being part of the
-system, and nothing needs reflashing again.
+The tested Nano uses the **115200-baud bootloader** (`arduino:avr:nano`).
+The 57600-baud old-bootloader read failed; the 115200 read and uploads succeeded.
 
-Checked 2026-11-05, and this has got worse rather than better: **there is no
-longer a free tier that is both always-on and plain-HTTP.**
+`check_cellular.sh` and `go_live.sh` **flash firmware by default**. The former
+uses a third-party test host rather than this project's ingest endpoint.
+`go_live.sh --no-flash` still changes the source hostname and opens a public
+tunnel. Neither script is a passive first diagnostic for an unidentified build.
+On the Nov firmware, `t` sends a test SMS; on the repository firmware, it tests
+HTTP. Never issue `t` before identifying the running firmware.
 
-| Option | Cost | Verdict |
-|---|---|---|
-| Oracle Cloud Always Free VM | free, card required at signup | Real always-on VM, plain HTTP. Best free option |
-| Small VPS (Hetzner CX22 etc.) | ~$4–5/mo | Simplest and most predictable |
-| Render free web service | free | **Will not work.** Sleeps after 15 min idle, ~60s to wake — the modem gives up after 10s |
-| Cloudflare Workers | free, 100k req/day | Always on and well within quota, but HTTPS-only and not Python — would mean rewriting the server and proving TLS on the modem first |
-| ThingSpeak | free tier | Works today, but you ruled it out |
+## Remaining acceptance checks
 
-Whichever you pick, deploying is: copy `server/fms_server.py`, run it, point
-`SERVER_HOST` at the hostname once.
+Repeated delivery must stay reliable, then recover from network interruptions
+and a full power cycle. Field operation needs its own suitable power source so
+USB can be disconnected. Probe calibration and placement, battery calibration,
+stale-data handling, and a persistent host remain separate requirements.
 
-### About HTTPS
+## End of the earlier temporary test
 
-Worth correcting an earlier claim: the ATmega328P does **not** need a TLS
-stack. The modem terminates TLS itself, so HTTPS is possible in principle —
-`AT+HTTPPARA="URL","https://..."` with an SSL context set via `AT+CSSLCFG`.
+The original application was restored and **all 32,768 flash bytes verified**
+against the pre-test backup. The temporary public tunnel was closed. The local
+USB bridge is restored separately; USB deliveries after row 57 are not evidence
+of cellular delivery. The two cellular records are preserved in
+`test-results/2026-11-05-cellular-readings.json`, with serial logs alongside.
 
-But SIMCom HTTPS is firmware-revision dependent and a known source of trouble
-(errors 702/713 appear repeatedly in the field reports). Do not design around
-it until it has been proven on this specific module. Plain HTTP to a host you
-control is the lower-risk path, and the payload carries no secrets beyond the
-node's write key.
-
----
-
-## 3. What runs where
-
-One origin serves both the API and the dashboard, so one tunnel — or one
-host — exposes the whole system:
-
-```
-  /update          ingest, exactly the query string the firmware sends
-  /feed            readings as JSON, newest first
-  /health          liveness
-  /dev.html        the console
-  /forecast.html   the per-field forecast
-```
-
-The page defaults its feed to **the same origin it was served from**, so a
-deployed copy needs no edit. Override with `?feed=<url>` to point a local page
-at a deployed server.
-
----
-
-## 4. Before the data is worth showing
-
-Power and hosting get readings flowing. These decide whether they mean
-anything.
-
-- **The last real readings were a fault condition.** Soil 1018 is above
-  `RISK_SOIL_FAULT_FROM` (960) — that is the firmware's own "probe is not in
-  the ground" band. It was a bench test with the probe in air. Nothing about a
-  live feed is useful until the probe is in soil.
-- **That node's battery was at 8%** (3660 mV, −78 mA discharging). It will not
-  run continuously. Charge or replace before a long run.
-- **Nodes 2 and 3 cannot upload at all** — `API_KEY_NODE_2` and `_3` are still
-  `REPLACE_WITH_NODE_2_KEY`. The server rejects unknown keys with 401, so those
-  nodes will log `FAILED (HTTP 401)` forever.
-- **`API_KEY_NODE_1` is committed to a public repo.** Anyone can post fake
-  readings. Rotate it and change it in both `Base_Code.ino` and `NODE_KEYS`.
-- **A failed upload is dropped, not retried.** A weak-signal window leaves a
-  hole in the series, and the dashboard's rate calculation draws straight
-  across it.
-
----
-
-## 5. Order
-
-1. Own supply + 1000µF cap on the modem — **nothing else can be tested first**
-2. `./server/check_cellular.sh` — prove the modem transmits, no tunnel needed
-3. `./server/go_live.sh` — prove a reading reaches our endpoint
-4. Probe in actual soil, battery charged — prove the readings mean something
-5. Pick a host, point `SERVER_HOST` at it once, stop reflashing
-6. Rotate the node 1 key; issue real keys for nodes 2 and 3
-7. Upload retry in firmware (2.10) and per-node SMS cooldown (2.4)
+The original firmware used in that earlier restoration has uploads OFF.
+The later hosted trial described above subsequently installed the configured
+HTTPS uploader, which is the currently running build. The source fixes need further reliability
+testing and eventual integration with the desired Nov 2026 features before a
+permanent field deployment. Nothing was pushed or deployed permanently.

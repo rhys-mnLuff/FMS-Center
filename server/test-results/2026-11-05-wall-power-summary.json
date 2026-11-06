@@ -1,0 +1,22 @@
+{
+  "host": "https://fms-field-console.bakedhazelnut.chatgpt.site",
+  "usb_present": false,
+  "pre_wall_readings": 8,
+  "wall_session": "1815153",
+  "wall_readings": 12,
+  "span_seconds": 427.269,
+  "intervals_seconds": [
+    62.351,
+    31.186,
+    35.569,
+    31.289,
+    82.574,
+    30.695,
+    30.555,
+    31.348,
+    31.52,
+    30.048,
+    30.134
+  ],
+  "latest_received_ts": 1793887056197
+}
