@@ -1352,7 +1352,7 @@ function renderFleetStats(){
   ];
   document.getElementById("fleet-stats").innerHTML = tiles.map(t=>`
     <div class="stat-tile ${t.cls||''}">
-      <div class="st-top"><span class="st-label">${t.label}</span>${t.delta||""}</div>
+      <div class="st-top"><span class="st-label">${t.label}</span>${t.value==="—" ? "" : (t.delta||"")}</div>
       <div class="st-value">${t.value}</div>
     </div>`).join("");
 }
