@@ -3,3 +3,9 @@ server/*.db
 
 # Private firmware deployment configuration
 FmsDeployment.h
+
+# Firmware images: compiled dumps embed FMS_ADMIN_PHONES, so they carry real
+# phone numbers even though the source no longer does. Kept on disk --
+# board-backup-2026-11-05.hex is the only copy of the Nov 2026 firmware,
+# whose source is lost -- but not distributed in a public repo.
+firmware/*.hex

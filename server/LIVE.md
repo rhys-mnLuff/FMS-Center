@@ -26,7 +26,7 @@ write key is configured in the hosting environment and in the ignored local
 separate provisioned keys before they can upload.
 
 The base currently has the repository's web-upload firmware installed,
-configured for HTTPS, TLS 1.2, SNI and validation against Google's GTS Root R4.
+configured for HTTPS, TLS 1.2, SNI and certificate validation.
 The public CA certificate is embedded in program flash and downloaded to the
 modem automatically, without the laptop. Certificate validation is enabled;
 valid modem time is required. The configured HTTPS path has now delivered real data to the hosted database.
@@ -67,6 +67,46 @@ Build the configured firmware by copying `Base_Code.ino` and the private header
 into an Arduino sketch directory and compiling with `arduino:avr:nano` and
 `--build-property compiler.cpp.extra_flags=-DFMS_DEPLOYMENT_CONFIG`. Do not use
 the legacy flashing scripts for this configured HTTPS deployment.
+
+## Endpoint moved to the ingest Worker (7 November)
+
+Storage moved to a separate Cloudflare account. The base now uploads to
+`https://fms-ingest.dashboard-data.workers.dev/update`, and both copies of
+`dev.html` read `/feed` and `/health` from the same host. The hosted
+dashboard's own `/update` and `/feed` still exist but nothing writes to them
+any more, so its database stays empty by design.
+
+**The root CA had to change with the host, and this is easy to miss.** The
+old `*.chatgpt.site` endpoint presented a Google Trust Services chain ending
+at GTS Root R4. `*.workers.dev` presents a Let's Encrypt chain:
+
+```
+leaf CN=dashboard-data.workers.dev
+  <- Let's Encrypt YE2
+  <- ISRG Root YE
+  <- ISRG Root X2
+  <- ISRG Root X1
+```
+
+Verified with openssl: the Worker validates against ISRG Root X1 and fails
+against GTS Root R4 with `unable to get local issuer certificate`. Left
+unchanged, every upload would have died inside the TLS handshake and shown
+up as a network or power fault -- the two things this project has already
+chased once.
+
+`TLS_ROOT_CA` in `Base_Code.ino` is now ISRG Root X1
+(SHA-256 `96:BC:EC:06:...:BD:DF:08:C6`), taken from the macOS system trust
+store rather than downloaded. `firmware/certs/isrg-root-x1.pem` is the same
+certificate kept alongside the retired `gtsr4.pem`. A configured build is
+23216 bytes, 75% of flash.
+
+If the endpoint moves again, check the issuer before trusting the embedded
+certificate:
+
+```bash
+echo | openssl s_client -connect HOST:443 -servername HOST 2>/dev/null \
+  | openssl x509 -noout -issuer
+```
 
 ## What has actually been proved
 

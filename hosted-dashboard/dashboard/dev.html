@@ -1352,7 +1352,7 @@ function renderFleetStats(){
   ];
   document.getElementById("fleet-stats").innerHTML = tiles.map(t=>`
     <div class="stat-tile ${t.cls||''}">
-      <div class="st-top"><span class="st-label">${t.label}</span>${t.delta||""}</div>
+      <div class="st-top"><span class="st-label">${t.label}</span>${t.value==="—" ? "" : (t.delta||"")}</div>
       <div class="st-value">${t.value}</div>
     </div>`).join("");
 }
@@ -2228,21 +2228,31 @@ async function fetchWeather(){
    Live mode stops the simulator entirely rather than blending the two: a
    chart mixing invented and measured readings would be worse than either.
    ========================================================================= */
-/* Where the readings come from. Three cases, in order:
-     ?feed=<url>        explicit override, for pointing a local page at a
-                        deployed server (or the reverse) without an edit
-     served from a host  assume the ingest server sits behind the same origin
-                        at /feed -- that is how it is deployed
-     served locally      fms_server.py on :8080 beside the page, the dev setup
-   Hardcoding localhost made the page work only on the machine running the
-   server, which is the one place a field dashboard is least useful. */
+/* Where the readings come from. In order:
+     ?feed=<url>   explicit override, for pointing at a different backend
+                   without an edit -- useful when testing a new Worker
+     localhost     the dev setup: fms_server.py on :8080 beside the page
+     otherwise     the ingest Worker, which owns storage as of 7 Nov 2026
+
+   Not same-origin any more. Storage moved to a separate Cloudflare account,
+   so the page and the data are no longer served from one place. This URL is
+   public and unauthenticated by design -- /feed is read-only, and the write
+   key never touches the browser. */
+const FEED_BASE = "https://fms-ingest.dashboard-data.workers.dev";
 const FEED_URL = (() => {
   const q = new URLSearchParams(location.search).get("feed");
   if (q) return q.replace(/\/+$/, "");
-  if (location.protocol.startsWith("http")) return location.origin + "/feed";
-  return "http://localhost:8080/feed";
+  const local = /^(localhost|127\.0\.0\.1|\[::1\]|)$/.test(location.hostname);
+  if (local) return "http://localhost:8080/feed";
+  return FEED_BASE + "/feed";
 })();
+/* The ingest Worker's own liveness, derived from the feed URL so the two
+   can never point at different backends. Without it the page cannot tell
+   "the Worker is down" from "the Worker is up and has no readings yet" --
+   both look like an empty feed, and they need completely different fixes. */
+const HEALTH_URL = FEED_URL.replace(/\/feed\/?$/, "/health");
 const FEED_POLL_MS = 4000;
+const HEALTH_POLL_MS = 20000;
 /* The simulator reads every 10s, so 30s of silence means something is wrong.
    A cellular node cannot be held to that: TS_MIN_INTERVAL_MS alone spaces
    uploads 20s apart, and a retry or a weak-signal window stretches it
@@ -2267,9 +2277,20 @@ function setLiveBanner(){
   let newest = 0;
   nodes.forEach(n=>{ if (n.lastSeen > newest) newest = n.lastSeen; });
   const age = newest ? fmtAgo(Math.round((Date.now()-newest)/1000)) : null;
-  const state = liveError ? `<b style="color:var(--red)">${liveError}</b>`
-    : `${liveSeen} reading${liveSeen===1?"":"s"} received`
+  // An empty feed has two very different causes. Say which one it is rather
+  // than leaving a blank dashboard to be interpreted.
+  let state;
+  if (liveError){
+    state = `<b style="color:var(--red)">${liveError}</b>`;
+  } else if (liveSeen === 0 && liveHealth && liveHealth.readings === 0){
+    state = `ingest reachable &middot; <b>no readings stored yet</b> — `
+          + `waiting for the base station's first upload`;
+  } else if (liveSeen === 0 && liveHealth === null){
+    state = `<b style="color:var(--red)">ingest not reachable</b> — nothing received`;
+  } else {
+    state = `${liveSeen} reading${liveSeen===1?"":"s"} received`
       + (age ? ` &middot; newest ${age} ago` : ` &middot; none yet`);
+  }
   el.innerHTML = `<span class="db-step" style="color:var(--green)">LIVE</span>
     <span class="db-text">Real readings from the base station — simulator stopped. ${state}</span>
     <button class="db-stop" id="live-stop" style="border-color:var(--green); color:var(--green)">Open simulated demo</button>`;
@@ -2335,10 +2356,21 @@ async function pollFeed(){
   } catch(e){
     liveError = "Feed unavailable — showing the last received readings with their original timestamps";
   }
+  if (Date.now() - lastHealthCheck > HEALTH_POLL_MS) await pollHealth();
   // Freshness keeps updating even when the server has no new rows.
   renderFleetStats(); renderNodesTable(); renderRainCard();
   updateNodeDetail(); renderNodeChips(); renderPrediction(); updateMap();
   setLiveBanner();
+}
+
+let liveHealth = null, lastHealthCheck = 0;
+async function pollHealth(){
+  lastHealthCheck = Date.now();
+  try{
+    const res = await fetch(HEALTH_URL, {cache:"no-store"});
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    liveHealth = await res.json();
+  } catch(e){ liveHealth = null; }
 }
 
 // The header pill is the one place that always says which source the page is
