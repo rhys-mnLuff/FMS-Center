@@ -9,3 +9,7 @@ FmsDeployment.h
 # board-backup-2026-11-05.hex is the only copy of the Nov 2026 firmware,
 # whose source is lost -- but not distributed in a public repo.
 firmware/*.hex
+
+# Subscriber lists contain private phone numbers
+subscribers*.csv
+*.numbers.csv
