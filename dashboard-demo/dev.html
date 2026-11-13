@@ -15,38 +15,38 @@
      neutral page. Surfaces are white, generously padded and lightly
      rounded; colour is reserved for state. */
   :root{
-    --bg:#f3f4f2; --bg-soft:#f0f1ee; --card:#ffffff; --card-border:#e7e8e3;
-    --ink:#1a211d; --ink-soft:#4d5751; --muted:#8c948e; --line:#eeefea;
-    --green:#1d7a54; --green-bg:#e7f4ed; --accent:#62b58c;
-    --amber:#8a6210; --amber-bg:#fbf1dc;
-    --red:#b23b2d; --red-bg:#fbeae7;
-    --water:#2b6490; --water-bg:#e9f0f6;
-    --purple:#5b4ea8; --purple-bg:#ece9f7;
+    --bg:#f6f7f9; --bg-soft:#eef0f4; --card:#ffffff; --card-border:#e1e5ea;
+    --ink:#111720; --ink-soft:#47515e; --muted:#636d7a; --line:#eceff3;
+    --green:#0f7a54; --green-bg:#e2f3ea; --accent:#1a6ca8;
+    --amber:#8a5c0a; --amber-bg:#fbf0d7;
+    --red:#b2382b; --red-bg:#fbe7e3;
+    --water:#1a6ca8; --water-bg:#e5eef6;
+    --purple:#584a9c; --purple-bg:#e9e7f4;
     --radius:16px; --radius-sm:11px; --radius-xs:8px;
-    --map-filter:saturate(.3) contrast(1.02) brightness(1.03);
+    --map-filter:saturate(.25) contrast(1.03) brightness(1.02);
     --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --bg:#0e1211; --bg-soft:#171c1a; --card:#151a18; --card-border:#242b28;
-      --ink:#e6eae7; --ink-soft:#a8b2ad; --muted:#6f7a74; --line:#222927;
-      --green:#4cba88; --green-bg:#122b21; --accent:#4cba88;
-      --amber:#d7a44a; --amber-bg:#2c2413;
-      --red:#e07262; --red-bg:#301b18;
-      --water:#5da5db; --water-bg:#122534;
-      --purple:#9b8ce0; --purple-bg:#1d1930;
-      --map-filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.95) saturate(.3);
+      --bg:#0d1117; --bg-soft:#161c24; --card:#131920; --card-border:#232b36;
+      --ink:#e3e9ef; --ink-soft:#a4aeb9; --muted:#7f8a97; --line:#1e252e;
+      --green:#3fb886; --green-bg:#0f2a21; --accent:#54a3d9;
+      --amber:#d2a04a; --amber-bg:#2b2312;
+      --red:#e0705f; --red-bg:#301a16;
+      --water:#54a3d9; --water-bg:#112331;
+      --purple:#9284dc; --purple-bg:#1b1830;
+      --map-filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.95) saturate(.25);
     }
   }
   :root[data-theme="dark"]{
-    --bg:#0e1211; --bg-soft:#171c1a; --card:#151a18; --card-border:#242b28;
-    --ink:#e6eae7; --ink-soft:#a8b2ad; --muted:#6f7a74; --line:#222927;
-    --green:#4cba88; --green-bg:#122b21; --accent:#4cba88;
-    --amber:#d7a44a; --amber-bg:#2c2413;
-    --red:#e07262; --red-bg:#301b18;
-    --water:#5da5db; --water-bg:#122534;
-    --purple:#9b8ce0; --purple-bg:#1d1930;
-    --map-filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.95) saturate(.3);
+    --bg:#0d1117; --bg-soft:#161c24; --card:#131920; --card-border:#232b36;
+    --ink:#e3e9ef; --ink-soft:#a4aeb9; --muted:#7f8a97; --line:#1e252e;
+    --green:#3fb886; --green-bg:#0f2a21; --accent:#54a3d9;
+    --amber:#d2a04a; --amber-bg:#2b2312;
+    --red:#e0705f; --red-bg:#301a16;
+    --water:#54a3d9; --water-bg:#112331;
+    --purple:#9284dc; --purple-bg:#1b1830;
+    --map-filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.95) saturate(.25);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -224,7 +224,7 @@
   .diag-lines{display:flex; flex-direction:column; gap:7px; margin-bottom:12px;}
   .diag-line{display:flex; gap:9px; font-size:12.5px; align-items:flex-start; color:var(--ink-soft);}
   .diag-line .dl-dot{width:7px;height:7px;border-radius:50%;flex:none;margin-top:5px;}
-  .diag-line.ok .dl-dot{background:var(--accent);}
+  .diag-line.ok .dl-dot{background:var(--green);}
   .diag-line.warn .dl-dot{background:var(--amber);}
   .diag-line.bad .dl-dot{background:var(--red);}
   .diag-rec{background:var(--bg-soft); border-radius:var(--radius-sm); padding:12px 14px; font-size:12.5px; color:var(--ink-soft); line-height:1.6;}
@@ -347,7 +347,7 @@
   #map{height:300px;border-radius:var(--radius-sm);overflow:hidden;border:1px solid var(--line);filter:var(--map-filter);}
 
   .console{
-    background:#131a17; color:#c6d4ca; border-radius:var(--radius-sm);
+    background:#121820; color:#c6d4ca; border-radius:var(--radius-sm);
     height:290px; overflow-y:auto; padding:12px 14px; font-family:var(--mono); font-size:11px;
     display:flex; flex-direction:column-reverse;
   }
@@ -374,7 +374,7 @@
   @media (max-width:600px){ .prov{grid-template-columns:1fr;} }
   .prov-col h5{font-size:12.5px; font-weight:600; margin:0 0 8px; display:flex; align-items:center; gap:7px;}
   .prov-col h5::before{content:""; width:7px; height:7px; border-radius:50%; background:var(--muted);}
-  .prov-col h5.ok::before{background:var(--accent);}
+  .prov-col h5.ok::before{background:var(--green);}
   .prov-col h5.est-h::before{background:var(--water);}
   .prov-col h5.warn-h::before{background:var(--amber);}
   .prov-col h5.sim-h::before{background:var(--purple);}
@@ -462,7 +462,7 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
         <div class="c-sub">Configured node locations; coordinates are provisioned until GNSS is verified.</div>
         <div id="map"></div>
         <div class="map-legend">
-          <span><i style="background:var(--accent)"></i>Normal</span>
+          <span><i style="background:var(--green)"></i>Normal</span>
           <span><i style="background:var(--amber)"></i>Watching</span>
           <span><i style="background:var(--red)"></i>Alerted</span>
           <span><i style="background:var(--muted)"></i>Offline</span>
@@ -1446,14 +1446,14 @@ function renderEventsTable(){
 }
 
 /* ---- charts ---- */
-Chart.defaults.color = "#8c948e";
+Chart.defaults.color = "#636d7a";
 Chart.defaults.font.family = "'Inter', sans-serif";
 Chart.defaults.font.size = 11;
-Chart.defaults.borderColor = "#eeefea";
+Chart.defaults.borderColor = "#eceff3";
 // A series palette, not a severity one: these three say "node 1/2/3", and
 // nothing in a chart line should read as an alert colour by accident.
-const nodeColors = {1:"#52ab85", 2:"#d08a4d", 3:"#5b8fc9"};
-const rainColor = "#7d6fc4";
+const nodeColors = {1:"#1a6ca8", 2:"#c96a2e", 3:"#2f8f6f"};
+const rainColor = "#7a6bb8";
 
 document.getElementById("chart-legend").innerHTML = nodes.map(n=>
   `<div class="li"><i style="background:${nodeColors[n.id]}"></i>${n.name}</div>`
@@ -1468,7 +1468,7 @@ function baseOpts(yOpts){
       x:{display:false},
       y: Object.assign({
         border:{display:false},
-        grid:{color:"#eeefea", drawTicks:false, borderDash:[4,4]},
+        grid:{color:"#eceff3", drawTicks:false, borderDash:[4,4]},
         ticks:{maxTicksLimit:5, padding:8}
       }, yOpts||{})
     },
@@ -1569,9 +1569,19 @@ function initMap(){
   });
   rainMarker = L.marker([rainNode.loc.lat, rainNode.loc.lon], {icon: makeDivIcon("#5b48a8", true)}).addTo(map).bindTooltip("Central Rain Gauge (planned)");
 }
+// Read the state colours from CSS rather than repeating them here. These
+// were hardcoded to an older palette and had already drifted out of sync
+// with the stylesheet; Leaflet markers are the one place a stale colour is
+// invisible until you compare the map against the legend beside it.
+// Reading the variables also means the markers follow dark mode for free.
+function cssVar(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
 function nodeStateColor(n){
-  if (isOffline(n)) return "#76838f";
-  return n.state==="ALERTED" ? "#b3392c" : n.state==="WATCHING" ? "#9a6708" : "#0f7a54";
+  if (isOffline(n)) return cssVar("--muted");
+  return n.state==="ALERTED" ? cssVar("--red")
+       : n.state==="WATCHING" ? cssVar("--amber")
+       : cssVar("--green");
 }
 function updateMap(){
   nodes.forEach(n=>{
@@ -2551,6 +2561,7 @@ document.getElementById("theme-toggle").addEventListener("click", ()=>{
   applyThemeAttr(next);
   try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
   applyChartTheme();
+  updateMap();   // markers read the CSS state colours, so repaint them too
 });
 
 /* =========================================================================
