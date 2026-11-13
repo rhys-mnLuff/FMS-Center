@@ -42,6 +42,7 @@ export const subscribers = sqliteTable("subscribers", {
 export const broadcasts = sqliteTable("broadcasts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   zone: integer("zone").notNull(),
+  kind: text("kind").notNull().default("flood"),   // flood | battery -- each has its own cooldown
   body: text("body").notNull(),
   reading_id: integer("reading_id"),            // the reading that triggered it
   recipient_count: integer("recipient_count").notNull(),

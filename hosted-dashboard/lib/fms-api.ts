@@ -1,4 +1,5 @@
-import { env } from "cloudflare:workers";
+import { env, waitUntil } from "cloudflare:workers";
+import { runAlerts } from "./alert-runner";
 import { integer, matchesKey, parseReading } from "./reading";
 const headers = { "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*" };
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers });
@@ -14,9 +15,12 @@ export async function update(request: Request) {
   catch { return json({ error: "invalid_reading" }, 400); }
   try {
     const { ts, received_ts, soil, water, health, rain, batt_pct, batt_mv, batt_ma, risk, lat, lon, sample_id } = reading;
-    await env.DB.prepare(`INSERT OR IGNORE INTO readings
+    const stored = await env.DB.prepare(`INSERT OR IGNORE INTO readings
       (node,ts,received_ts,soil,water,health,rain,batt_pct,batt_mv,batt_ma,risk,lat,lon,sample_id)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(node,ts,received_ts,soil,water,health,rain,batt_pct,batt_mv,batt_ma,risk,lat,lon,sample_id).run();
+    // Only a genuinely new reading can trigger a text; a retried duplicate is ignored.
+    // waitUntil: the node is on a cellular link and must get its "1" without waiting for SMS.
+    if (stored.meta.changes > 0) waitUntil(runAlerts(node));
     return new Response("1", { headers });
   } catch { return json({ error: "storage_unavailable" }, 503); }
 }

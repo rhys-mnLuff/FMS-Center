@@ -240,35 +240,8 @@
 
 <div class="section-title">
   <h2>By field</h2>
-  <span>same sky, different ground — outlook is per node</span>
 </div>
 <div class="areas" id="areas"></div>
-
-<div class="section-title"><h2>Where each number comes from</h2></div>
-<div class="sources">
-  <div>
-    <h5 class="a">Live</h5>
-    <ul>
-      <li>Regional temperature, humidity</li>
-      <li>Hourly rainfall forecast, 12h</li>
-      <li>Conditions code</li>
-    </ul>
-  </div>
-  <div>
-    <h5 class="b">Simulated</h5>
-    <ul>
-      <li>All node soil and water readings</li>
-      <li>Per-field outlook derived from them</li>
-      <li>Hardware is built but not yet logging</li>
-    </ul>
-  </div>
-</div>
-
-<footer>
-  Regional weather is live from open-meteo.com. Node readings are simulated within
-  the ranges measured on our own bench (dry ≈875, saturated ≈385 raw ADC). The
-  per-field outlook is a model, not a validated forecast.
-</footer>
 
 </main>
 <script>
@@ -473,15 +446,12 @@ function renderAreas(){
           <span class="outlook ${ol.key}">${ol.label}</span>
         </div>
         <div class="verdict"><span class="lead">${lead}</span>${body}</div>
-        ${haveWx ? `<div class="strip">${strip}</div>
-        <div class="strip-key">Hourly rainfall, mm · red hour = soil projected at or past ${SOIL_FLOOD_THRESHOLD}</div>` :
-        `<div class="strip-key" style="padding:10px 0 14px;">Rainfall forecast unavailable — showing ground state only.</div>`}
+        ${haveWx ? `<div class="strip">${strip}</div>` : ``}
         <div class="ground">
           <div class="g"><div class="k">Soil now</div><div class="v ${z.cls}">${soilR}</div></div>
           <div class="g"><div class="k">Condition</div><div class="v ${z.cls}" style="font-size:11px;">${z.label}</div></div>
           <div class="g"><div class="k">Water</div><div class="v ${waterR>WATER_FLOOD_THRESHOLD?'bad':''}">${waterR}</div></div>
         </div>
-        <div class="why"><b>Why this differs from the regional forecast:</b> ${f.note}. Same rain, but this block starts at ${soilR} raw and sheds water ${f.drainage === "poor" ? "slowly" : f.drainage === "fair" ? "moderately" : "well"}, so it responds differently to the hours above.</div>
       </div>`;
   }).join("");
 }

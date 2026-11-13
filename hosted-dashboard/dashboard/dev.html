@@ -25,6 +25,11 @@
     --radius:18px; --radius-sm:12px; --radius-xs:9px;
     --card-shadow:0 1px 2px rgba(16,24,40,.04);
     --card-top:transparent;
+    --glass:linear-gradient(180deg, rgba(255,255,255,.6), rgba(255,255,255,.3));
+    --glass-fill:rgba(255,255,255,.86);
+    --glass-blur:blur(8px) saturate(115%);
+    --page-glow:radial-gradient(900px 480px at 12% -8%, rgba(58,86,212,.07), transparent 62%),
+                radial-gradient(760px 420px at 96% 4%, rgba(87,71,168,.055), transparent 62%);
     --map-filter:saturate(.25) contrast(1.03) brightness(1.02);
     --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
   }
@@ -39,6 +44,12 @@
       --purple:#a789f8; --purple-bg:#201b3e;
       --card-shadow:0 10px 28px rgba(0,0,0,.38);
       --card-top:rgba(255,255,255,.045);
+      --glass:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.012));
+      --glass-fill:rgba(17,26,46,.72);
+      --glass-blur:blur(14px) saturate(140%);
+      --page-glow:radial-gradient(900px 520px at 14% -6%, rgba(109,139,255,.17), transparent 60%),
+                  radial-gradient(720px 440px at 94% 6%, rgba(167,137,248,.13), transparent 60%),
+                  radial-gradient(820px 520px at 62% 104%, rgba(79,209,197,.075), transparent 60%);
       --map-filter:invert(1) hue-rotate(205deg) brightness(.72) contrast(1.1) saturate(.32);
     }
   }
@@ -52,13 +63,20 @@
     --purple:#a789f8; --purple-bg:#201b3e;
     --card-shadow:0 10px 28px rgba(0,0,0,.38);
       --card-top:rgba(255,255,255,.045);
+      --glass:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.012));
+      --glass-fill:rgba(17,26,46,.72);
+      --glass-blur:blur(14px) saturate(140%);
+      --page-glow:radial-gradient(900px 520px at 14% -6%, rgba(109,139,255,.17), transparent 60%),
+                  radial-gradient(720px 440px at 94% 6%, rgba(167,137,248,.13), transparent 60%),
+                  radial-gradient(820px 520px at 62% 104%, rgba(79,209,197,.075), transparent 60%);
       --map-filter:invert(1) hue-rotate(205deg) brightness(.72) contrast(1.1) saturate(.32);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   html{scroll-behavior:smooth; scroll-padding-top:18px;}
   body{
-    background:var(--bg); color:var(--ink);
+    background:var(--page-glow), var(--bg); color:var(--ink);
+    background-attachment:fixed;
     font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     min-height:100vh; font-size:13.5px; -webkit-font-smoothing:antialiased;
   }
@@ -73,7 +91,9 @@
   /* ---------- shell ---------- */
   .sidebar{
     position:fixed; top:12px; left:12px; bottom:12px; width:218px; z-index:40;
-    background:var(--card); border:1px solid var(--card-border); border-radius:18px;
+    background:var(--glass), var(--glass-fill);
+    -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
+    border:1px solid var(--card-border); border-radius:18px;
     padding:16px 12px 14px; display:flex; flex-direction:column; gap:14px;
     box-shadow:var(--card-shadow); border-top-color:var(--card-top);
   }
@@ -136,7 +156,9 @@
   /* ---------- toolbar ---------- */
   .toolbar{
     display:flex; align-items:center; gap:7px; flex-wrap:wrap;
-    background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius);
+    background:var(--glass), var(--glass-fill);
+    -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
+    border:1px solid var(--card-border); border-radius:var(--radius);
     padding:9px 11px; margin-bottom:22px;
   }
   .seg{display:inline-flex; background:var(--bg-soft); border-radius:999px; padding:3px; gap:2px;}
@@ -157,7 +179,9 @@
   /* Created at runtime by setLiveBanner() / startDemo(). */
   .demo-banner{
     font-size:12.5px; line-height:1.55; color:var(--ink-soft);
-    background:var(--card); border:1px solid var(--card-border); border-left:3px solid var(--accent);
+    background:var(--glass), var(--glass-fill);
+    -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
+    border:1px solid var(--card-border); border-left:3px solid var(--accent);
     border-radius:var(--radius-sm); padding:12px 15px; margin-bottom:18px;
   }
   .demo-banner b{color:var(--ink);}
@@ -171,7 +195,9 @@
   #economics-stats{grid-template-columns:repeat(4,1fr);}
   @media (max-width:1240px){ .stat-grid, #economics-stats{grid-template-columns:repeat(3,1fr);} }
   @media (max-width:720px){ .stat-grid, #economics-stats{grid-template-columns:repeat(2,1fr);} }
-  .stat-tile{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius);
+  .stat-tile{background:var(--glass), var(--glass-fill);
+    -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
+    border:1px solid var(--card-border); border-radius:var(--radius);
     padding:15px 17px 16px; min-width:0; box-shadow:var(--card-shadow); border-top-color:var(--card-top);}
   .stat-tile .st-top{display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:21px;}
   .stat-tile .st-label{font-size:12.5px; color:var(--muted); font-weight:450; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
@@ -184,7 +210,9 @@
   .stat-tile.bad .st-value{color:var(--red);}
 
   /* ---------- tables ---------- */
-  .table-wrap{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius);
+  .table-wrap{background:var(--glass), var(--glass-fill);
+    -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
+    border:1px solid var(--card-border); border-radius:var(--radius);
     overflow-x:auto; padding:4px 6px; box-shadow:var(--card-shadow); border-top-color:var(--card-top);}
   table{width:100%; border-collapse:collapse; font-size:12.5px;}
   th,td{padding:11px 12px; text-align:left; border-bottom:1px dashed var(--line); white-space:nowrap;}
@@ -218,7 +246,9 @@
 
   /* ---------- panels ---------- */
   .panel, .chart-card, .nd-card, .diag-card, .rain-card{
-    background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius);
+    background:var(--glass), var(--glass-fill);
+    -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
+    border:1px solid var(--card-border); border-radius:var(--radius);
     padding:18px 20px; min-width:0;
     box-shadow:var(--card-shadow); border-top-color:var(--card-top);
   }
@@ -258,7 +288,9 @@
   /* ---------- advisory ---------- */
   .advisory{display:grid; grid-template-columns:1.1fr .9fr; gap:12px;}
   @media (max-width:900px){ .advisory{grid-template-columns:1fr;} }
-  .adv-col{background:var(--card); border:1px solid var(--card-border); border-radius:var(--radius); padding:18px 20px; min-width:0;}
+  .adv-col{background:var(--glass), var(--glass-fill);
+    -webkit-backdrop-filter:var(--glass-blur); backdrop-filter:var(--glass-blur);
+    border:1px solid var(--card-border); border-radius:var(--radius); padding:18px 20px; min-width:0;}
   .adv-sms{font-size:15px; line-height:1.6; color:var(--ink); font-weight:450; letter-spacing:-0.01em;}
   .adv-sms.warn{color:var(--amber);} .adv-sms.bad{color:var(--red);}
   .adv-tech{font-size:12.5px; color:var(--ink-soft); line-height:1.65;}
@@ -420,7 +452,6 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
     <a href="#weather"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.4M12 19.1v2.4M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.9 19.1l1.7-1.7M17.4 6.6l1.7-1.7"/></svg>Weather</a>
     <a href="#diagnostics"><svg viewBox="0 0 24 24"><path d="M9.5 4.5 5 9l3 3 4.5-4.5a4 4 0 0 1 5.5-5.5l-3 3 2 2 3-3a4 4 0 0 1-5.5 5.5"/><path d="m10 14-6 6"/></svg>Diagnostics</a>
     <a href="#calibration"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="17" r="2"/></svg>Calibration</a>
-    <a href="#reference"><svg viewBox="0 0 24 24"><path d="M5 4.5h10a2 2 0 0 1 2 2v13H7a2 2 0 0 1-2-2Z"/><path d="M17 6.5h2v13H7"/></svg>Reference</a>
   </nav>
 
   <div class="sb-foot">
@@ -470,7 +501,6 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
     <div class="predict-wrap">
       <div class="panel predict-map-panel">
         <h4>Field map</h4>
-        <div class="c-sub">Configured node locations; coordinates are provisioned until GNSS is verified.</div>
         <div id="map"></div>
         <div class="map-legend">
           <span><i style="background:var(--green)"></i>Normal</span>
@@ -541,11 +571,11 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
   <section id="trends">
     <div class="section-title"><h2>Trends</h2></div>
     <div class="chart-grid">
-      <div class="chart-card"><h4>Soil moisture</h4><div class="c-sub">Raw ADC — falls as soil wets</div><canvas id="chart-soil"></canvas></div>
-      <div class="chart-card"><h4>Water level</h4><div class="c-sub">Raw ADC — rises as water stands</div><canvas id="chart-water"></canvas></div>
-      <div class="chart-card"><h4>Soil health index</h4><div class="c-sub">0–100, derived from soil moisture</div><canvas id="chart-health"></canvas></div>
-      <div class="chart-card"><h4 id="risk-chart-title">Reported flood level</h4><div class="c-sub" id="risk-chart-sub">0 Normal · 1 Watch · 2 Warning · 3 Flood</div><canvas id="chart-risk"></canvas></div>
-      <div class="chart-card"><h4>Rate of change</h4><div class="c-sub">Percent of scale per minute</div><canvas id="chart-rate"></canvas></div>
+      <div class="chart-card"><h4>Soil moisture</h4><canvas id="chart-soil"></canvas></div>
+      <div class="chart-card"><h4>Water level</h4><canvas id="chart-water"></canvas></div>
+      <div class="chart-card"><h4>Soil health index</h4><canvas id="chart-health"></canvas></div>
+      <div class="chart-card"><h4 id="risk-chart-title">Reported flood level</h4><canvas id="chart-risk"></canvas></div>
+      <div class="chart-card"><h4>Rate of change</h4><canvas id="chart-rate"></canvas></div>
     </div>
     <div class="chart-legend" id="chart-legend"></div>
   </section>
@@ -555,7 +585,6 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
     <div class="split">
       <div class="panel">
         <h4>Events</h4>
-        <div class="c-sub">State changes, alerts and faults.</div>
         <div class="table-wrap" style="border:none; padding:0; max-height:320px; overflow-y:auto;">
           <table>
             <thead><tr><th style="width:92px;">Time</th><th>Node</th><th>Event</th><th>Detail</th></tr></thead>
@@ -565,7 +594,6 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
       </div>
       <div class="panel">
         <h4>Packet log</h4>
-        <div class="c-sub">Radio traffic as the base station receives it.</div>
         <div class="console" id="console"></div>
       </div>
     </div>
@@ -575,7 +603,6 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
     <div class="section-title"><h2>Weather</h2></div>
     <div class="panel">
       <h4>Right now near the farm</h4>
-      <div class="c-sub">Live observation from Open-Meteo.</div>
       <div id="weather-card"><div class="weather-loading">Fetching live weather…</div></div>
     </div>
   </section>
@@ -602,7 +629,6 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:14px;">
           <div>
             <h4>Field-capacity run</h4>
-            <div class="c-sub" style="margin:0; max-width:560px;">Soak, drain 24–48h, then log 5 readings across 3 replicates. Readings here are simulated bench samples.</div>
           </div>
           <button class="btn" id="cal-start-btn">Start run</button>
         </div>
@@ -628,55 +654,8 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
     </div>
   </section>
 
-  <section id="reference">
-    <div class="section-title"><h2>Cost</h2></div>
-    <div class="stat-grid" id="economics-stats"></div>
-    <div style="font-size:11.5px; color:var(--muted); margin-top:10px; line-height:1.6; max-width:80ch;">$120/node is the project's cost ceiling, not a summed BOM — no priced parts list exists in the repo yet. $1,000 is a conservative floor for commercial flood telemetry, per the README's framing rather than quoted pricing.</div>
-
-    <div class="section-title"><h2>Data provenance</h2></div>
-    <div class="panel prov">
-      <div class="prov-col">
-        <h5 class="ok">Measured</h5>
-        <ul>
-          <li>Dry soil 875.0 <span class="pv">SD 23.0, n=5</span></li>
-          <li>Flooded soil 385.4 <span class="pv">SD 25.1, n=5</span></li>
-          <li>Soil bands = mean ±2SD</li>
-        </ul>
-        <p>31 Aug 2026, round 1 of 3. One soil type, one node.</p>
-      </div>
-      <div class="prov-col">
-        <h5 class="est-h">Estimated</h5>
-        <ul>
-          <li>Healthy band 552–699 <span class="pv">clay-loam literature</span></li>
-          <li>Buffers: water 30, rain 980</li>
-          <li>Idle readings <span class="pv">observed, not logged</span></li>
-        </ul>
-        <p>Never present these as test results.</p>
-      </div>
-      <div class="prov-col">
-        <h5 class="warn-h">Not yet tested</h5>
-        <ul>
-          <li>Soil field capacity</li>
-          <li>Fast-drop rate <span class="pv">needs a real wetting event</span></li>
-          <li>Rain intensity, water depth</li>
-        </ul>
-        <p>Rain and water are on/off only. Fast-drop is excluded from the warning level until calibrated.</p>
-      </div>
-      <div class="prov-col">
-        <h5 class="sim-h">Demo mode only</h5>
-        <ul>
-          <li>All node readings and scenarios</li>
-          <li>Battery, brownout, offline state</li>
-          <li>Rain gauge <span class="pv">no hardware exists</span></li>
-          <li>Cell signal, upload failures</li>
-        </ul>
-        <p>Flood prediction is dashboard-side. Base_code compares to a threshold and fires; it does not forecast.</p>
-      </div>
-    </div>
-  </section>
 
   <footer>
-    <div id="source-footer">Waiting for sensor readings.</div>
     <button class="btn ghost" id="export-csv">Download raw data (CSV)</button>
   </footer>
 
@@ -2141,12 +2120,26 @@ function buildNodeDetailCards(){
   });
 }
 
+// A vertical gradient from the line colour down to nothing -- the area fill
+// the reference uses under its charts. Built per canvas because a CanvasGradient
+// is bound to the context it came from.
+function areaFill(ctx, color){
+  const h = ctx.canvas.height || 120;
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, color + "66");
+  g.addColorStop(1, color + "00");
+  return g;
+}
+
 function makeMiniChart(id, color, threshold, yOpts){
   const cs = getComputedStyle(document.documentElement);
-  return new Chart(document.getElementById(id), {
+  const el = document.getElementById(id);
+  if (!el) return stubChart();
+  return new Chart(el, {
     type:"line",
     data:{labels:[], datasets:[
-      {data:[], borderColor:color, backgroundColor:"transparent", borderWidth:1.8, pointRadius:0},
+      {data:[], borderColor:color, borderWidth:1.8, pointRadius:0,
+       fill:true, backgroundColor: c => areaFill(c.chart.ctx, color)},
       {data:[], borderColor:cs.getPropertyValue("--red").trim(), borderWidth:1, borderDash:[2,3], pointRadius:0}
     ]},
     options:{
@@ -2406,11 +2399,7 @@ function setModePill(live){
   pill.classList.toggle("live", !!live);
   label.textContent = live ? "Live feed" : "Simulated";
   document.body.dataset.mode = live ? "live" : "demo";
-  document.getElementById("risk-chart-title").textContent = live ? "Reported flood level" : "Derived risk score";
-  document.getElementById("risk-chart-sub").textContent = live ? "0 Normal · 1 Watch · 2 Warning · 3 Flood" : "Uncalibrated composite of wetness and water level";
-  document.getElementById("source-footer").textContent = live
-    ? "Sensor readings from the server. Signal strength and SMS delivery are not reported."
-    : "Simulated telemetry — generated for demonstration.";
+  document.getElementById("risk-chart-title").textContent = live ? "Reported flood level (0–3)" : "Derived risk score";
 }
 
 function setLive(on){
@@ -2740,22 +2729,6 @@ function renderCalWizard(){
   document.getElementById("cal-log-btn").style.display = done ? "none" : "";
   document.getElementById("cal-complete-btn").style.display = done ? "" : "none";
 }
-function renderEconomics(){
-  const NODE_COST = 120, COMMERCIAL_COST = 1000;
-  const n = nodes.length;
-  const fleetCost = n*NODE_COST, commercialCost = n*COMMERCIAL_COST;
-  const tiles = [
-    {label:"Cost per node", value:"$"+NODE_COST},
-    {label:"This fleet", value:"$"+fleetCost},
-    {label:"Commercial equivalent", value:"$"+commercialCost.toLocaleString()},
-    {label:"Subscription", value:"$0<small>/mo</small>"},
-  ];
-  document.getElementById("economics-stats").innerHTML = tiles.map(t=>`
-    <div class="stat-tile ${t.cls||""}">
-      <div class="st-top"><span class="st-label">${t.label}</span></div>
-      <div class="st-value">${t.value}</div>
-    </div>`).join("");
-}
 
 document.getElementById("cal-start-btn").addEventListener("click", startCalibration);
 document.getElementById("cal-log-btn").addEventListener("click", logCalReading);
@@ -2832,7 +2805,6 @@ renderNodeChips();
 selectNode((nodes.find(n=>n.state==="ALERTED") || nodes.find(n=>n.state==="WATCHING") || nodes[0]).id);
 // The projection cross-checks live rain, so refresh it once weather lands.
 fetchWeather().then(()=>renderPrediction()).catch(()=>{});
-renderEconomics();
 if (START_IN_DEMO) {
   logLine("Simulation started — generated readings", "rx");
 } else {
