@@ -25,6 +25,10 @@
     --radius:18px; --radius-sm:12px; --radius-xs:9px;
     --card-shadow:0 1px 2px rgba(16,24,40,.04);
     --card-top:transparent;
+    --text-glow:none;
+    --dot-glow:0 0 0 transparent;
+    --badge-glow:none;
+    --ring-glow:none;
     --glass:linear-gradient(180deg, rgba(255,255,255,.6), rgba(255,255,255,.3));
     --glass-fill:rgba(255,255,255,.86);
     --glass-blur:blur(8px) saturate(115%);
@@ -44,6 +48,10 @@
       --purple:#a789f8; --purple-bg:#201b3e;
       --card-shadow:0 10px 28px rgba(0,0,0,.38);
       --card-top:rgba(255,255,255,.045);
+      --text-glow:0 0 22px rgba(160,185,255,.28);
+      --dot-glow:0 0 9px;
+      --badge-glow:0 0 14px -4px currentColor;
+      --ring-glow:0 0 26px -4px var(--accent);
       --glass:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.012));
       --glass-fill:rgba(17,26,46,.72);
       --glass-blur:blur(14px) saturate(140%);
@@ -63,6 +71,10 @@
     --purple:#a789f8; --purple-bg:#201b3e;
     --card-shadow:0 10px 28px rgba(0,0,0,.38);
       --card-top:rgba(255,255,255,.045);
+      --text-glow:0 0 22px rgba(160,185,255,.28);
+      --dot-glow:0 0 9px;
+      --badge-glow:0 0 14px -4px currentColor;
+      --ring-glow:0 0 26px -4px var(--accent);
       --glass:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.012));
       --glass-fill:rgba(17,26,46,.72);
       --glass-blur:blur(14px) saturate(140%);
@@ -431,6 +443,31 @@
 body[data-mode="live"] .controls-bar button:not(#live-btn),
 body[data-mode="live"] [data-toggle-fail],
 body[data-mode="live"] #cal-start-btn { display:none !important; }
+
+  /* ---------- glow ----------
+     Light coming off the elements themselves, as in the reference. Kept to
+     large-radius / low-alpha shadows: a tight bright glow on text is the
+     thing that destroys legibility, and these numbers are the readout of a
+     flood console before they are decoration. Dark theme only -- the tokens
+     above collapse to none in light. */
+  .stat-tile .st-value, .verdict .v-eta, .nd-health .h-val,
+  .rain-headline .rgd-value, .pm .v, .page-head h1{
+    text-shadow:var(--text-glow);
+  }
+  /* Dots carry their own state colour, so they glow in it: box-shadow with no
+     colour falls back to currentColor, and the markup sets both. */
+  .map-legend i, .node-chip i, .nd-name i, .diag-line .dl-dot, .hpill i{
+    box-shadow:var(--dot-glow);
+  }
+  .row-badge, .outlook, .st-delta.up, .st-delta.down{ box-shadow:var(--badge-glow); }
+  .row-badge.planned, .row-badge.quiet, .row-badge.offline{ box-shadow:none; }
+  .sb-nav a.on{
+    background:linear-gradient(90deg, rgba(109,139,255,.16), rgba(109,139,255,.04));
+    box-shadow:inset 0 0 0 1px rgba(109,139,255,.14);
+  }
+  .sb-nav a.on svg{ filter:drop-shadow(0 0 6px var(--accent)); }
+  .rain-gauge-dial{ box-shadow:var(--ring-glow); }
+  .node-chip.active{ box-shadow:0 0 18px -6px var(--accent); }
 </style>
 </head>
 <body>
@@ -503,11 +540,11 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
         <h4>Field map</h4>
         <div id="map"></div>
         <div class="map-legend">
-          <span><i style="background:var(--green)"></i>Normal</span>
-          <span><i style="background:var(--amber)"></i>Watching</span>
-          <span><i style="background:var(--red)"></i>Alerted</span>
-          <span><i style="background:var(--muted)"></i>Offline</span>
-          <span><i style="background:var(--purple)"></i>Rain gauge (planned)</span>
+          <span><i style="background:var(--green);color:var(--green)"></i>Normal</span>
+          <span><i style="background:var(--amber);color:var(--amber)"></i>Watching</span>
+          <span><i style="background:var(--red);color:var(--red)"></i>Alerted</span>
+          <span><i style="background:var(--muted);color:var(--muted)"></i>Offline</span>
+          <span><i style="background:var(--purple);color:var(--purple)"></i>Rain gauge (planned)</span>
         </div>
       </div>
       <div class="panel predict-panel">
@@ -1438,6 +1475,30 @@ function renderEventsTable(){
   }).join("") || `<tr><td colspan="4" style="text-align:center; color:var(--muted); padding:24px;">No events yet.</td></tr>`;
 }
 
+
+/* Chart.js draws flat strokes. The reference's lines emit light, so the
+   canvas shadow is set before each dataset and cleared after. Registered
+   only when the real library loaded -- the offline stub has no register(). */
+if (GRAPHICS_OK && Chart.register){
+  Chart.register({
+    id:"fmsGlow",
+    beforeDatasetDraw(chart, args){
+      if (effectiveTheme() !== "dark") return;
+      const ds = chart.data.datasets[args.index];
+      const col = typeof ds.borderColor === "string" ? ds.borderColor : null;
+      if (!col) return;
+      chart.ctx.save();
+      chart.ctx.shadowColor = col;
+      chart.ctx.shadowBlur = ds.borderDash ? 0 : 9;   // no glow on threshold lines
+    },
+    afterDatasetDraw(chart, args){
+      if (effectiveTheme() !== "dark") return;
+      const ds = chart.data.datasets[args.index];
+      if (typeof ds.borderColor === "string") chart.ctx.restore();
+    }
+  });
+}
+
 /* ---- charts ---- */
 Chart.defaults.color = "#5d6a85";
 Chart.defaults.font.family = "'Inter', sans-serif";
@@ -1449,7 +1510,7 @@ const nodeColors = {1:"#6d8bff", 2:"#f58fb0", 3:"#4fd1c5"};
 const rainColor = "#a789f8";
 
 document.getElementById("chart-legend").innerHTML = nodes.map(n=>
-  `<div class="li"><i style="background:${nodeColors[n.id]}"></i>${n.name}</div>`
+  `<div class="li"><i style="background:${nodeColors[n.id]};color:${nodeColors[n.id]}"></i>${n.name}</div>`
 ).join("");
 
 function baseOpts(yOpts){
@@ -1853,7 +1914,7 @@ function renderNodeChips(){
   const el = document.getElementById("node-chips");
   el.innerHTML = nodes.map(n=>`
     <button class="node-chip ${n.id===selectedNodeId?'active':''}" data-node="${n.id}">
-      <i style="background:${nodeStateColor(n)}"></i>${n.name}
+      <i style="background:${nodeStateColor(n)};color:${nodeStateColor(n)}"></i>${n.name}
     </button>`).join("");
   el.querySelectorAll(".node-chip").forEach(b=>
     b.addEventListener("click", ()=>selectNode(b.dataset.node)));
@@ -2091,7 +2152,7 @@ function buildNodeDetailCards(){
     <div class="nd-card" data-node="${n.id}">
       <div class="nd-head">
         <div>
-          <div class="nd-name"><i style="background:${nodeColors[n.id]}"></i>${n.name}</div>
+          <div class="nd-name"><i style="background:${nodeColors[n.id]};color:${nodeColors[n.id]}"></i>${n.name}</div>
           <div class="nd-sub" id="nd-sub-${n.id}">—</div>
         </div>
         <div class="nd-health" id="nd-health-${n.id}">
