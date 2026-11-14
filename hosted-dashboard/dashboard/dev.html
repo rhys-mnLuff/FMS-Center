@@ -15,18 +15,22 @@
      neutral page. Surfaces are white, generously padded and lightly
      rounded; colour is reserved for state. */
   :root{
-    --bg:#f6f7f8; --bg-soft:#f0f1f3; --card:#ffffff; --card-border:#e7e9ec;
-    --ink:#15181c; --ink-soft:#4a515a; --muted:#5f666f; --line:#eef0f2;
-    --green:#1a6b4a; --green-bg:#e4f2e9; --accent:#16181b;
-    --amber:#7d5405; --amber-bg:#fbf0d4;
-    --red:#a8352a; --red-bg:#fae6e3;
-    --water:#1d6288; --water-bg:#e6eff5;
-    --purple:#4b5564; --purple-bg:#eceef1;
-    --series-1:#2a6f97; --series-2:#c0611f; --series-3:#1f7a6b; --series-rain:#78808a;
-    --page-bg:none;
+    --bg:#eceded; --bg-soft:#f3efe0; --card:#fdfbf4; --card-border:#eae5d4;
+    --ink:#1a1a17; --ink-soft:#55534a; --muted:#6d6a5d; --line:#efead9;
+    --green:#1a6b4a; --green-bg:#e3f0e6; --accent:#1b1a16;
+    --amber:#7d5405; --amber-bg:#fbeec4;
+    --red:#a8352a; --red-bg:#f8e3df;
+    --water:#1d6288; --water-bg:#e4edf3;
+    --purple:#4b5564; --purple-bg:#eaeaea;
+    --series-1:#2a6f97; --series-2:#c0611f; --series-3:#1f7a6b; --series-rain:#8a8578;
+    /* The reference's background: cool grey at the top left warming to butter
+       at the right. A fixed gradient, so it does not slide while scrolling. */
+    --page-bg:radial-gradient(1100px 820px at 104% 0%, #fbe384 0%, rgba(251,227,132,0) 62%),
+              radial-gradient(1000px 760px at 88% 100%, #fbeeae 0%, rgba(251,238,174,0) 64%),
+              linear-gradient(115deg, #e7e8e9 0%, #eeebdf 40%, #f7eec2 72%, #fbeaa6 100%);
     --radius:26px; --radius-sm:16px; --radius-xs:12px;
-    --card-shadow:0 1px 2px rgba(16,24,40,.04);
-    --card-edge:var(--card-border);
+    --card-shadow:0 1px 3px rgba(84,70,28,.045), 0 12px 32px rgba(84,70,28,.06);
+    --card-edge:rgba(130,110,50,.08);
     --card-top:var(--card-border);
     --text-glow:none;
     --dot-glow:0 0 0 transparent;
@@ -85,6 +89,10 @@
       --map-filter:invert(1) hue-rotate(205deg) brightness(.72) contrast(1.1) saturate(.32);
   }
   *{box-sizing:border-box;}
+  /* A class that sets display beats the user-agent rule for [hidden], so
+     .node-chips{display:flex} kept rendering while the element was marked
+     hidden. Make the attribute win. */
+  [hidden]{display:none !important;}
   html,body{margin:0;padding:0;}
   html{scroll-behavior:smooth; scroll-padding-top:18px;}
   body{
@@ -369,6 +377,11 @@
   .nd-health .h-val{font-size:30px; font-weight:450; line-height:1; font-variant-numeric:tabular-nums; color:var(--ink); letter-spacing:-.035em;}
   .nd-health .h-lab{font-size:11.5px; color:var(--muted); margin-top:5px;}
   .nd-health.mid .h-val{color:var(--amber);} .nd-health.bad .h-val{color:var(--red);}
+  /* The roster row, folded into the card it used to sit above. */
+  .nd-stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(96px,1fr)); gap:10px; margin-bottom:16px;}
+  .nd-stats .s{background:var(--bg-soft); border-radius:var(--radius-xs); padding:9px 11px; min-width:0;}
+  .nd-stats .s .k{font-size:11.5px; color:var(--muted);}
+  .nd-stats .s .v{font-size:16px; font-weight:500; margin-top:3px; font-variant-numeric:tabular-nums;}
   .nd-charts{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
   .nd-charts > *{min-width:0;}
   @media (max-width:520px){ .nd-charts{grid-template-columns:1fr;} }
@@ -839,19 +852,15 @@ function riskScore(wetnessPct, water){
    ========================================================================= */
 const BASE_LOC = {lat:14.5333, lon:121.0000, name:"Base Station"};
 
+/* One sensor. A deployment covers one area and one area gets one sensor, so
+   three markers clustered half a kilometre apart was never the real shape.
+   Still an array, and nothing below assumes its length -- adding a second
+   area is a second entry (and its own dashboard), not a rewrite. */
 const nodes = [
-  { id:"1", name:"North Rice Paddy", type:"field", loc:{lat:14.5361, lon:120.9995},
-    soil:660, water:0, direct:true, scenario:"spike", scenarioTick:0,
+  { id:"1", name:"North Rice Paddy", type:"field", loc:{lat:14.5333, lon:121.0000},
+    soil:660, water:0, direct:true, scenario:"flood", scenarioTick:0,
     history:[], state:"NORMAL", overCount:0, underCount:0, packets:0, lastSeen:Date.now(), smsCount:0,
-    battery:92, failed:false, failReason:null },
-  { id:"2", name:"East Canal Field", type:"field", loc:{lat:14.5352, lon:121.0044},
-    soil:780, water:0, direct:true, scenario:"flood", scenarioTick:0,
-    history:[], state:"NORMAL", overCount:0, underCount:0, packets:0, lastSeen:Date.now(), smsCount:0,
-    battery:78, failed:false, failReason:null },
-  { id:"3", name:"Riverside Plot", type:"field", loc:{lat:14.5288, lon:120.9978},
-    soil:690, water:0, direct:false, relayVia:"2", scenario:"drift", scenarioTick:0,
-    history:[], state:"NORMAL", overCount:0, underCount:0, packets:0, lastSeen:Date.now(), smsCount:0,
-    battery:55, failed:false, failReason:null }
+    battery:92, failed:false, failReason:null }
 ];
 
 // Battery/failure model — entirely simulated, see Known Simplifications.
@@ -936,7 +945,7 @@ function pushEvent(type, node, detail){
    ========================================================================= */
 let speedMult = 15;   // default: fast enough that a scenario moves on screen
 let simClock = 0;
-let nextRead = {1:0,2:0,3:3300,R:1800};
+let nextRead = Object.fromEntries(nodes.map((n,i)=>[n.id, i*1100]).concat([["R",1800]]));
 let lastTickWall = performance.now();
 
 function noise(range){ return (Math.random()*2-1)*range; }
@@ -1258,7 +1267,8 @@ function warmupHistory(){
     stepRainNode(true);
   }
   // Live reads resume from where the warmup left off.
-  nextRead = {1:simClock+READ_INTERVAL_MS, 2:simClock+READ_INTERVAL_MS, 3:simClock+READ_INTERVAL_MS+3300, R:simClock+READ_INTERVAL_MS+1800};
+  nextRead = Object.fromEntries(nodes.map((n,i)=>[n.id, simClock+READ_INTERVAL_MS+i*1100])
+      .concat([["R", simClock+READ_INTERVAL_MS+1800]]));
 }
 
 /* =========================================================================
@@ -1399,6 +1409,11 @@ function batteryCellHtml(node){
 }
 
 function renderNodesTable(){
+  // One area, one sensor: a roster of a single row sat directly above the
+  // card describing that same sensor. Hidden, not deleted -- a second area
+  // brings it back.
+  const wrap = document.querySelector("#nodes .table-wrap");
+  if (wrap) wrap.hidden = nodes.length < 2;
   document.getElementById("nodes-table").innerHTML = nodes.map(n=>{
     // With no history there is no reading. Falling back to n.soil/n.water
     // would print the last simulated value as though a node had sent it.
@@ -1485,9 +1500,13 @@ const nodeColors = new Proxy({}, {
 });
 Object.defineProperty(window, "rainColor", { get: () => cssVar("--series-rain") });
 
-document.getElementById("chart-legend").innerHTML = nodes.map(n=>
-  `<div class="li"><i style="background:${nodeColors[n.id]};color:${nodeColors[n.id]}"></i>${n.name}</div>`
-).join("");
+(function initLegend(){
+  const el = document.getElementById("chart-legend");
+  el.hidden = nodes.length < 2;
+  el.innerHTML = nodes.map(n=>
+    `<div class="li"><i style="background:${nodeColors[n.id]};color:${nodeColors[n.id]}"></i>${n.name}</div>`
+  ).join("");
+})();
 
 function baseOpts(yOpts){
   return {
@@ -1577,6 +1596,7 @@ function applyChartTheme(){
   });
   if (typeof renderNodeChips === "function") renderNodeChips();
   const legend = document.getElementById("chart-legend");
+  if (legend) legend.hidden = nodes.length < 2;
   if (legend) legend.innerHTML = nodes.map(n=>
     `<div class="li"><i style="background:${nodeColors[n.id]};color:${nodeColors[n.id]}"></i>${n.name}</div>`).join("");
   if (predictChart){
@@ -1900,6 +1920,7 @@ function fmtEta(min){
 
 function renderNodeChips(){
   const el = document.getElementById("node-chips");
+  el.hidden = nodes.length < 2;
   el.innerHTML = nodes.map(n=>`
     <button class="node-chip ${n.id===selectedNodeId?'active':''}" data-node="${n.id}">
       <i style="background:${nodeStateColor(n)};color:${nodeStateColor(n)}"></i>${n.name}
@@ -2140,13 +2161,15 @@ function buildNodeDetailCards(){
     <div class="nd-card" data-node="${n.id}">
       <div class="nd-head">
         <div>
-          <div class="nd-name"><i style="background:${nodeColors[n.id]};color:${nodeColors[n.id]}"></i>${n.name}</div>
+          <div class="nd-name"><i style="background:${nodeColors[n.id]};color:${nodeColors[n.id]}"></i>${n.name}
+            <span id="nd-state-${n.id}"></span></div>
         </div>
         <div class="nd-health" id="nd-health-${n.id}">
           <div class="h-val">—</div>
           <div class="h-lab" id="nd-zone-${n.id}">—</div>
         </div>
       </div>
+      <div class="nd-stats" id="nd-stats-${n.id}"></div>
       <div class="nd-charts">
         <div class="nd-chart">
           <h5>Soil</h5>          <div class="nd-chart-box"><canvas id="nd-soil-${n.id}"></canvas></div>
@@ -2211,6 +2234,22 @@ function updateNodeDetail(){
     const band = healthBand(last.soil);
 
     const zone = soilZone(last.soil);
+    const offlineNow = isOffline(n);
+    const meta = offlineNow
+      ? {cls:"offline", label: n.failReason==="brownout" ? "Offline (battery)" : n.failed ? "Offline (fault)" : "Offline"}
+      : statusMeta(n.state);
+    const st = document.getElementById(`nd-state-${n.id}`);
+    if (st) st.innerHTML = ` <span class="row-badge ${meta.cls}">${meta.label}</span>`;
+    const stats = document.getElementById(`nd-stats-${n.id}`);
+    if (stats) stats.innerHTML = [
+      ["Link",  n.direct ? "Direct" : `Via node ${n.relayVia}`],
+      ["Soil",  offlineNow ? "—" : last.soil],
+      ["Water", offlineNow ? "—" : last.water],
+      ["Risk",  offlineNow ? "—" : last.risk.toFixed(0)],
+      ["Battery", offlineNow ? "—" : `${n.battery.toFixed(0)}%`],
+      ["Last seen", n.lastSeen ? fmtAgo(Math.round((Date.now()-n.lastSeen)/1000)) : "never"],
+    ].map(([k,v])=>`<div class="s"><div class="k">${k}</div><div class="v">${v}</div></div>`).join("");
+
     const hEl = document.getElementById(`nd-health-${n.id}`);
     hEl.className = `nd-health ${band}`;
     hEl.querySelector(".h-val").textContent = offline || (liveMode && last.soil >= SOIL_FAULT_FLOOR) ? "—" : last.health;
@@ -2484,7 +2523,7 @@ function tick(){
   if (liveMode){ requestAnimationFrame(tick); return; }   // live data drives rendering
   if (speedMult > 0){
     simClock += wallDelta * speedMult;
-    ["1","2","3"].forEach(id=>{
+    nodes.forEach(({id})=>{
       if (simClock >= nextRead[id]){
         stepFieldNode(nodes.find(n=>n.id===id));
         nextRead[id] = simClock + READ_INTERVAL_MS + Math.random()*400;
@@ -2515,7 +2554,7 @@ function setSpeed(mult){
 document.querySelectorAll(".controls-bar button[data-speed]").forEach(btn=>{
   btn.addEventListener("click", ()=>setSpeed(btn.dataset.speed));
 });
-document.getElementById("trigger-flood").addEventListener("click", ()=>{ nodes.find(n=>n.id==="2").scenarioTick = 6; });
+document.getElementById("trigger-flood").addEventListener("click", ()=>{ nodes[0].scenarioTick = 6; });
 
 /* =========================================================================
    DEMO SEQUENCE — a fixed, repeatable run through the brief's cascade so a
@@ -2526,11 +2565,11 @@ document.getElementById("trigger-flood").addEventListener("click", ()=>{ nodes.f
 const DEMO_STEPS = [
   {at:0,   label:"Baseline — all fields normal",        run(){ demoReset(); }},
   {at:6,   label:"Rain begins — gauge drops below 980", run(){ rainNode.scenarioTick = 0; }},
-  {at:16,  label:"Soil wetting — East Canal enters the watch band", run(){ nodes.find(n=>n.id==="2").scenarioTick = 10; }},
+  {at:16,  label:"Soil wetting — soil enters the watch band", run(){ nodes[0].scenarioTick = 10; }},
   {at:30,  label:"Prediction: saturation projected ahead of the event", run(){ selectNode("2"); }},
-  {at:46,  label:"Saturation reached — soil at or below 436",  run(){ nodes.find(n=>n.id==="2").scenarioTick = 26; }},
-  {at:62,  label:"Standing water — flood confirmed, SMS fires", run(){ nodes.find(n=>n.id==="2").scenarioTick = 32; }},
-  {at:82,  label:"Draining — alert clears through hysteresis", run(){ nodes.find(n=>n.id==="2").scenarioTick = 52; }},
+  {at:46,  label:"Saturation reached — soil at or below 436",  run(){ nodes[0].scenarioTick = 26; }},
+  {at:62,  label:"Standing water — flood confirmed, SMS fires", run(){ nodes[0].scenarioTick = 32; }},
+  {at:82,  label:"Draining — alert clears through hysteresis", run(){ nodes[0].scenarioTick = 52; }},
 ];
 let demoTimer = null, demoT = 0;
 
@@ -2553,7 +2592,7 @@ function makeDemoWeather(){
 
 function demoReset(){
   nodes.forEach(n=>{ n.failed=false; n.failReason=null; n.state="NORMAL"; n.overCount=0; n.underCount=0; });
-  const e = nodes.find(n=>n.id==="2");
+  const e = nodes[0];
   e.soil = 780; e.water = 0; e.scenarioTick = 0;
   rainNode.raw = 1015; rainNode.scenarioTick = 40;
   lastSmsSimTime = 0;
