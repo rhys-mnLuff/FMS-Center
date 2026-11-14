@@ -5,16 +5,16 @@ The code is finished. What is left is accounts, secrets and your list.
 ## How it behaves
 A sensor uploads a reading to `/update`. If its last 3 readings are all at WARNING or FLOOD risk, everyone subscribed to that node's zone gets one text (max one per zone per hour). A critically low, discharging battery texts only `ADMIN_NUMBERS` (max one per node per 12 h). Zone = node id.
 
-## 1. PhilSMS account
-1. Sign up at https://app.philsms.com and top up credit.
-2. Developers > create an API token. This is `PHILSMS_TOKEN`.
-3. Register a sender name and **wait for approval**. Philippine carriers reject unapproved names. This is `PHILSMS_SENDER_ID`.
+## 1. Semaphore account
+1. Sign up at https://semaphore.co and buy credits. Regular SMS costs 1 credit per 160 characters; flood alerts go via the priority route, which costs 2 credits per SMS but is not rate limited. 300 people = 600 credits per flood alert.
+2. In the account, copy your API key. This is `SEMAPHORE_API_KEY`.
+3. Sender name: the first one is free, but custom names need approval (up to 5 business days) and Semaphore may reject accounts that are not a business. **Leave `SEMAPHORE_SENDER_NAME` empty to use your account's default sender name** and skip approval. If you later get a custom name approved, set it.
 
 ## 2. Secrets (hosting environment variables, never the repo)
 | Name | Value |
 |---|---|
-| `PHILSMS_TOKEN` | from step 1 |
-| `PHILSMS_SENDER_ID` | approved sender name |
+| `SEMAPHORE_API_KEY` | from step 1 |
+| `SEMAPHORE_SENDER_NAME` | optional, see step 1.3 |
 | `ADMIN_NUMBERS` | your own number(s), comma-separated, e.g. `09171234567` |
 | `SMS_ADMIN_KEY` | a long random string: `openssl rand -hex 24` |
 | `SMS_INBOUND_KEY` | another long random string |
@@ -37,6 +37,7 @@ SMS_ADMIN_KEY=... node scripts/import-subscribers.mjs https://YOUR-DASHBOARD sub
 `--consent` is your confirmation that these people agreed to receive alerts (Data Privacy Act). Re-running is safe; opted-out people are never re-enabled. A `zone,number` CSV loads several zones at once.
 
 ## Known gaps
-- **STOP replies**: PhilSMS documents no inbound webhook, so replies cannot reach `/sms-inbound` yet. Leave `SMS_OPT_OUT` unset, and mark people stopped by hand (`UPDATE subscribers SET status='stopped' WHERE msisdn='+63...'`) until PhilSMS can forward replies.
-- Delivery status is not polled; rows are `sent` or `failed` at send time.
+- **STOP replies**: Semaphore documents no inbound webhook, so replies cannot reach `/sms-inbound` yet. Leave `SMS_OPT_OUT` unset, and mark people stopped by hand (`UPDATE subscribers SET status='stopped' WHERE msisdn='+63...'`) until Semaphore can forward replies.
+- Delivery status is not polled yet (Semaphore supports `GET /messages/{id}`); rows are `sent` or `failed` at send time.
+- Semaphore silently ignores any message that begins with "TEST", and messages with links may be blocked by some networks; the alert wording has neither.
 - The rules live in `lib/alerts.ts`; wording in `lib/sms-templates.ts` (mirrors the firmware).

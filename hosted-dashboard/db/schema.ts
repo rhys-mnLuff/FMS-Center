@@ -49,7 +49,7 @@ export const broadcasts = sqliteTable("broadcasts", {
   created_ts: integer("created_ts").notNull(),
 }, table => [index("broadcasts_zone_ts").on(table.zone, table.created_ts)]);
 
-/* Per-recipient delivery state. PhilSMS has no delivery webhook, so status
+/* Per-recipient delivery state. Semaphore has no delivery webhook (status is polled via GET /messages/{id}), so status
    is updated by polling rather than pushed; the column is the same either
    way, which keeps a later provider switch from touching the schema. */
 export const sms_sends = sqliteTable("sms_sends", {

@@ -3,8 +3,8 @@ import { isStopMessage, normalisePhNumber } from "../../lib/subscribers";
 import { matchesKey } from "../../lib/reading";
 
 /**
- * Inbound STOP. PhilSMS documents no inbound webhook, so nothing calls this
- * yet -- it exists for whichever forwarder delivers replies (a PhilSMS
+ * Inbound STOP. Semaphore documents no inbound webhook, so nothing calls this
+ * yet -- it exists for whichever forwarder delivers replies (a Semaphore
  * webhook if support enables one, or a gateway phone). Guarded by a secret.
  *
  * POST /sms-inbound?key=...   JSON {"from": "+639...", "message": "STOP"}

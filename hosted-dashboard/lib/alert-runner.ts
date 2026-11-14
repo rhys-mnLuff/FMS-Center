@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import { decideBattery, decideFlood, type Decision, type RecentReading, type Site } from "./alerts";
-import { sendSms } from "./philsms";
+import { sendSms } from "./semaphore";
 import { normalisePhNumber, recipientsForZone, type Subscriber } from "./subscribers";
 import { withOptOut } from "./sms-templates";
 
@@ -38,24 +38,27 @@ async function dispatch(node: number, d: Extract<Decision, { send: true }>, read
   ).bind(node, d.kind, body, readingId, to.length, now).run();
   const broadcastId = b.meta.last_row_id as number;
 
-  const results = await sendSms({ token: env.PHILSMS_TOKEN!, senderId: env.PHILSMS_SENDER_ID! }, to, body);
+  // Flood alerts go via Semaphore's priority route (not rate limited); battery notices are not urgent.
+  const results = await sendSms(
+    { apiKey: env.SEMAPHORE_API_KEY!, senderName: env.SEMAPHORE_SENDER_NAME || undefined, priority: d.kind === "flood" },
+    to, body);
 
-  const inserts = results.flatMap(r => r.recipients.map(msisdn =>
+  const inserts = results.map(r =>
     env.DB!.prepare("INSERT INTO sms_sends (broadcast_id,msisdn,provider_id,status,error,updated_ts) VALUES (?,?,?,?,?,?)")
-      .bind(broadcastId, msisdn, r.uid ?? null, r.ok ? "sent" : "failed", r.error ?? null, Date.now())));
+      .bind(broadcastId, r.msisdn, r.id ?? null, r.ok ? "sent" : "failed", r.error ?? null, Date.now()));
   await env.DB!.batch(inserts);
 
   // Like the firmware: a send that failed outright must not start the cooldown.
   if (!results.some(r => r.ok)) {
     await env.DB!.prepare("UPDATE broadcasts SET created_ts=0 WHERE id=?").bind(broadcastId).run();
-    console.error("sms: every batch failed for zone", node, results[0]?.error);
+    console.error("sms: every send failed for zone", node, results[0]?.error);
   }
 }
 
 /** Called after a reading is stored. Never throws: ingest must not depend on SMS. */
 export async function runAlerts(node: number, now = Date.now()): Promise<void> {
   try {
-    if (!env.DB || !env.PHILSMS_TOKEN || !env.PHILSMS_SENDER_ID) return;
+    if (!env.DB || !env.SEMAPHORE_API_KEY) return;
     const { results } = await env.DB.prepare(
       "SELECT id,soil,water,rain,risk,batt_pct,batt_ma,lat,lon FROM readings WHERE node=? ORDER BY ts DESC LIMIT 3",
     ).bind(node).all<RecentReading & { id: number }>();
