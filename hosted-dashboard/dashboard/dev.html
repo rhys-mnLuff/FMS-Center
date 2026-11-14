@@ -15,80 +15,71 @@
      neutral page. Surfaces are white, generously padded and lightly
      rounded; colour is reserved for state. */
   :root{
-    --bg:#f4f6fb; --bg-soft:#ebeff7; --card:#ffffff; --card-border:#dfe5f0;
-    --ink:#0e1626; --ink-soft:#414e6b; --muted:#5d6a85; --line:#e9edf6;
-    --green:#0d7a54; --green-bg:#e0f3ea; --accent:#3a56d4;
+    --bg:#f7f8f6; --bg-soft:#eef0ec; --card:#ffffff; --card-border:#e3e6e1;
+    --ink:#0f1311; --ink-soft:#454d48; --muted:#5e665f; --line:#ecefe9;
+    --green:#0d7a54; --green-bg:#e0f3ea; --accent:#3f6b12;
     --amber:#8a5c0a; --amber-bg:#fbf0d7;
     --red:#b2382b; --red-bg:#fbe7e3;
     --water:#1a6ca8; --water-bg:#e5eef6;
-    --purple:#5747a8; --purple-bg:#e9e7f6;
+    --purple:#4f5a6b; --purple-bg:#eaedf1;
     --radius:18px; --radius-sm:12px; --radius-xs:9px;
-    --card-shadow:0 1px 2px rgba(16,24,40,.04);
-    --card-top:transparent;
+    --card-shadow:none;
+    --card-top:var(--card-border);
     --text-glow:none;
     --dot-glow:0 0 0 transparent;
     --badge-glow:none;
     --ring-glow:none;
-    --glass:linear-gradient(180deg, rgba(255,255,255,.6), rgba(255,255,255,.3));
-    --glass-fill:rgba(255,255,255,.86);
-    --glass-blur:blur(8px) saturate(115%);
-    --page-glow:radial-gradient(900px 480px at 12% -8%, rgba(58,86,212,.07), transparent 62%),
-                radial-gradient(760px 420px at 96% 4%, rgba(87,71,168,.055), transparent 62%);
+    --glass:none;
+    --glass-fill:var(--card);
+    --glass-blur:none;
     --map-filter:saturate(.25) contrast(1.03) brightness(1.02);
     --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --bg:#070d1b; --bg-soft:#16213a; --card:#111a2e; --card-border:#223052;
-      --ink:#eef2fa; --ink-soft:#a7b4d0; --muted:#8191ae; --line:#1d2742;
-      --green:#3ddc97; --green-bg:#0c2e24; --accent:#6d8bff;
-      --amber:#f3b24c; --amber-bg:#2f2412;
-      --red:#f87a72; --red-bg:#351c1e;
-      --water:#4fb0e8; --water-bg:#0f2638;
-      --purple:#a789f8; --purple-bg:#201b3e;
+      --bg:#0a0c0b; --bg-soft:#141816; --card:#111513; --card-border:#1f2522;
+      --ink:#eef2ef; --ink-soft:#a6b0aa; --muted:#868f88; --line:#1b211e;
+      --green:#3ddc97; --green-bg:#0d2a1f; --accent:#cdf25a;
+      --amber:#f3b24c; --amber-bg:#2d2411;
+      --red:#f87a72; --red-bg:#331b19;
+      --water:#5bb4e8; --water-bg:#0e2433;
+      --purple:#93a0b5; --purple-bg:#1a2029;
       --card-shadow:0 10px 28px rgba(0,0,0,.38);
       --card-top:rgba(255,255,255,.045);
-      --text-glow:0 0 22px rgba(160,185,255,.28);
-      --dot-glow:0 0 9px;
-      --badge-glow:0 0 14px -4px currentColor;
-      --ring-glow:0 0 26px -4px var(--accent);
-      --glass:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.012));
-      --glass-fill:rgba(17,26,46,.72);
-      --glass-blur:blur(14px) saturate(140%);
-      --page-glow:radial-gradient(900px 520px at 14% -6%, rgba(109,139,255,.17), transparent 60%),
-                  radial-gradient(720px 440px at 94% 6%, rgba(167,137,248,.13), transparent 60%),
-                  radial-gradient(820px 520px at 62% 104%, rgba(79,209,197,.075), transparent 60%);
+      --text-glow:none;
+      --dot-glow:0 0 0 transparent;
+      --badge-glow:none;
+      --ring-glow:none;
+      --glass:none;
+      --glass-fill:var(--card);
+      --glass-blur:none;
       --map-filter:invert(1) hue-rotate(205deg) brightness(.72) contrast(1.1) saturate(.32);
     }
   }
   :root[data-theme="dark"]{
-    --bg:#070d1b; --bg-soft:#16213a; --card:#111a2e; --card-border:#223052;
-    --ink:#eef2fa; --ink-soft:#a7b4d0; --muted:#8191ae; --line:#1d2742;
-    --green:#3ddc97; --green-bg:#0c2e24; --accent:#6d8bff;
-    --amber:#f3b24c; --amber-bg:#2f2412;
-    --red:#f87a72; --red-bg:#351c1e;
-    --water:#4fb0e8; --water-bg:#0f2638;
-    --purple:#a789f8; --purple-bg:#201b3e;
+    --bg:#0a0c0b; --bg-soft:#141816; --card:#111513; --card-border:#1f2522;
+    --ink:#eef2ef; --ink-soft:#a6b0aa; --muted:#868f88; --line:#1b211e;
+    --green:#3ddc97; --green-bg:#0d2a1f; --accent:#cdf25a;
+    --amber:#f3b24c; --amber-bg:#2d2411;
+    --red:#f87a72; --red-bg:#331b19;
+    --water:#5bb4e8; --water-bg:#0e2433;
+    --purple:#93a0b5; --purple-bg:#1a2029;
     --card-shadow:0 10px 28px rgba(0,0,0,.38);
       --card-top:rgba(255,255,255,.045);
-      --text-glow:0 0 22px rgba(160,185,255,.28);
-      --dot-glow:0 0 9px;
-      --badge-glow:0 0 14px -4px currentColor;
-      --ring-glow:0 0 26px -4px var(--accent);
-      --glass:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.012));
-      --glass-fill:rgba(17,26,46,.72);
-      --glass-blur:blur(14px) saturate(140%);
-      --page-glow:radial-gradient(900px 520px at 14% -6%, rgba(109,139,255,.17), transparent 60%),
-                  radial-gradient(720px 440px at 94% 6%, rgba(167,137,248,.13), transparent 60%),
-                  radial-gradient(820px 520px at 62% 104%, rgba(79,209,197,.075), transparent 60%);
+      --text-glow:none;
+      --dot-glow:0 0 0 transparent;
+      --badge-glow:none;
+      --ring-glow:none;
+      --glass:none;
+      --glass-fill:var(--card);
+      --glass-blur:none;
       --map-filter:invert(1) hue-rotate(205deg) brightness(.72) contrast(1.1) saturate(.32);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   html{scroll-behavior:smooth; scroll-padding-top:18px;}
   body{
-    background:var(--page-glow), var(--bg); color:var(--ink);
-    background-attachment:fixed;
+    background:var(--bg); color:var(--ink);
     font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     min-height:100vh; font-size:13.5px; -webkit-font-smoothing:antialiased;
   }
@@ -199,6 +190,7 @@
   .demo-banner b{color:var(--ink);}
 
   .section-title{display:flex; align-items:baseline; justify-content:space-between; margin:30px 2px 12px; flex-wrap:wrap; gap:6px;}
+  .sec-actions{display:flex; gap:6px;}
   .section-title h2{font-size:16px; font-weight:600; letter-spacing:-0.02em; color:var(--ink);}
   .section-title span{font-size:12px; color:var(--muted);}
 
@@ -363,7 +355,6 @@
   .nd-head{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:14px;}
   .nd-name{font-size:14px; font-weight:600; display:flex; align-items:center; gap:8px; letter-spacing:-0.015em;}
   .nd-name i{width:8px; height:8px; border-radius:50%; flex:none;}
-  .nd-sub{font-size:11.5px; color:var(--muted); margin-top:3px;}
   .nd-health{text-align:right; flex:none;}
   .nd-health .h-val{font-size:23px; font-weight:600; line-height:1; font-variant-numeric:tabular-nums; color:var(--ink); letter-spacing:-.035em;}
   .nd-health .h-lab{font-size:11.5px; color:var(--muted); margin-top:5px;}
@@ -462,12 +453,12 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
   .row-badge, .outlook, .st-delta.up, .st-delta.down{ box-shadow:var(--badge-glow); }
   .row-badge.planned, .row-badge.quiet, .row-badge.offline{ box-shadow:none; }
   .sb-nav a.on{
-    background:linear-gradient(90deg, rgba(109,139,255,.16), rgba(109,139,255,.04));
-    box-shadow:inset 0 0 0 1px rgba(109,139,255,.14);
+    background:var(--bg-soft);
+    box-shadow:inset 2px 0 0 var(--accent);
   }
-  .sb-nav a.on svg{ filter:drop-shadow(0 0 6px var(--accent)); }
+  .sb-nav a.on svg{ color:var(--accent); opacity:1; }
   .rain-gauge-dial{ box-shadow:var(--ring-glow); }
-  .node-chip.active{ box-shadow:0 0 18px -6px var(--accent); }
+  .node-chip.active{ box-shadow:none; }
 </style>
 </head>
 <body>
@@ -482,13 +473,10 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
     <a href="#overview"><svg viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10.5V20h12v-9.5"/></svg>Overview</a>
     <a href="#prediction"><svg viewBox="0 0 24 24"><path d="M3 17l5.5-6 4 3.5L21 6"/><path d="M16 6h5v5"/></svg>Prediction</a>
     <a href="#nodes"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2"/><path d="M3.5 10h17M9 10v9"/></svg>Nodes</a>
-    <a href="#sensors"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>Sensors</a>
-    <a href="#rainfall"><svg viewBox="0 0 24 24"><path d="M17 14a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.6 1.7A4 4 0 0 0 7 16h10Z"/><path d="M9 19v1.5M12 19v2.5M15 19v1.5"/></svg>Rainfall</a>
+    <a href="#conditions"><svg viewBox="0 0 24 24"><path d="M17 14a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.6 1.7A4 4 0 0 0 7 16h10Z"/><path d="M9 19v1.5M12 19v2.5M15 19v1.5"/></svg>Conditions</a>
     <a href="#trends"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V5M16 20v-7M22 20H2"/></svg>Trends</a>
     <a href="#activity"><svg viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 4 13 2.5-7h5"/></svg>Activity</a>
-    <a href="#weather"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.4M12 19.1v2.4M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M2.5 12h2.4M19.1 12h2.4M4.9 19.1l1.7-1.7M17.4 6.6l1.7-1.7"/></svg>Weather</a>
-    <a href="#diagnostics"><svg viewBox="0 0 24 24"><path d="M9.5 4.5 5 9l3 3 4.5-4.5a4 4 0 0 1 5.5-5.5l-3 3 2 2 3-3a4 4 0 0 1-5.5 5.5"/><path d="m10 14-6 6"/></svg>Diagnostics</a>
-    <a href="#calibration"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="17" r="2"/></svg>Calibration</a>
+    <a href="#maintenance"><svg viewBox="0 0 24 24"><path d="M5 7h14M5 12h14M5 17h14"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="8" cy="17" r="2"/></svg>Maintenance</a>
   </nav>
 
   <div class="sb-foot">
@@ -508,7 +496,6 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
     <div class="head-right">
       <div class="hpill" id="link-pill"><i></i><span>—</span></div>
       <div class="hpill" id="mode-pill"><i></i><span id="mode-label">Simulated</span></div>
-      <div class="hpill"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/></svg><span id="clock"></span></div>
     </div>
   </div>
 
@@ -525,8 +512,6 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
     <button class="tbtn" id="run-demo">Run sequence</button>
     <button class="tbtn" id="trigger-flood">Trigger flood</button>
     <button class="tbtn" id="trigger-storm">Trigger storm</button>
-    <button class="tbtn" id="run-diagnostic">Run diagnostic</button>
-    <button class="tbtn" id="toggle-signal">Weak signal</button>
   </div>
 
   <section id="overview">
@@ -579,15 +564,12 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
         <tbody id="nodes-table"></tbody>
       </table>
     </div>
-  </section>
-
-  <section id="sensors">
-    <div class="section-title"><h2>Sensors</h2></div>
     <div class="node-detail-grid" id="node-detail-grid"></div>
   </section>
 
-  <section id="rainfall">
-    <div class="section-title"><h2>Rainfall</h2></div>
+  <section id="conditions">
+    <div class="section-title"><h2>Conditions</h2></div>
+    <div class="split">
     <div class="rain-card">
       <div class="rain-head"><h3>Central rain gauge <span class="row-badge planned">planned</span></h3></div>
       <div class="rain-body">
@@ -602,6 +584,11 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
           <div class="rain-stat-row"><span class="rs-label">Last reading</span><span class="rs-value" id="rain-lastseen">—</span></div>
         </div>
       </div>
+    </div>
+    <div class="panel">
+      <h4>Right now near the farm</h4>
+      <div id="weather-card"><div class="weather-loading">Fetching live weather…</div></div>
+    </div>
     </div>
   </section>
 
@@ -636,21 +623,16 @@ body[data-mode="live"] #cal-start-btn { display:none !important; }
     </div>
   </section>
 
-  <section id="weather">
-    <div class="section-title"><h2>Weather</h2></div>
-    <div class="panel">
-      <h4>Right now near the farm</h4>
-      <div id="weather-card"><div class="weather-loading">Fetching live weather…</div></div>
+  <section id="maintenance">
+    <div class="section-title">
+      <h2>Maintenance</h2>
+      <span class="sec-actions">
+        <button class="tbtn" id="run-diagnostic">Run diagnostic</button>
+        <button class="tbtn" id="toggle-signal">Weak signal</button>
+      </span>
     </div>
-  </section>
-
-  <section id="diagnostics">
-    <div class="section-title"><h2>Diagnostics</h2></div>
     <div id="diagnostic-history"><div class="diag-empty">No diagnostic run yet.</div></div>
-  </section>
-
-  <section id="calibration">
-    <div class="section-title"><h2>Calibration</h2></div>
+    <div class="panel" style="margin-top:12px;">
     <div class="panel">
       <table>
         <thead><tr><th>Category</th><th>n</th><th>Mean (raw)</th><th>Min</th><th>Max</th></tr></thead>
@@ -1476,29 +1458,6 @@ function renderEventsTable(){
 }
 
 
-/* Chart.js draws flat strokes. The reference's lines emit light, so the
-   canvas shadow is set before each dataset and cleared after. Registered
-   only when the real library loaded -- the offline stub has no register(). */
-if (GRAPHICS_OK && Chart.register){
-  Chart.register({
-    id:"fmsGlow",
-    beforeDatasetDraw(chart, args){
-      if (effectiveTheme() !== "dark") return;
-      const ds = chart.data.datasets[args.index];
-      const col = typeof ds.borderColor === "string" ? ds.borderColor : null;
-      if (!col) return;
-      chart.ctx.save();
-      chart.ctx.shadowColor = col;
-      chart.ctx.shadowBlur = ds.borderDash ? 0 : 9;   // no glow on threshold lines
-    },
-    afterDatasetDraw(chart, args){
-      if (effectiveTheme() !== "dark") return;
-      const ds = chart.data.datasets[args.index];
-      if (typeof ds.borderColor === "string") chart.ctx.restore();
-    }
-  });
-}
-
 /* ---- charts ---- */
 Chart.defaults.color = "#5d6a85";
 Chart.defaults.font.family = "'Inter', sans-serif";
@@ -1506,8 +1465,8 @@ Chart.defaults.font.size = 11;
 Chart.defaults.borderColor = "#e9edf6";
 // A series palette, not a severity one: these three say "node 1/2/3", and
 // nothing in a chart line should read as an alert colour by accident.
-const nodeColors = {1:"#6d8bff", 2:"#f58fb0", 3:"#4fd1c5"};
-const rainColor = "#a789f8";
+const nodeColors = {1:"#cdf25a", 2:"#5bb4e8", 3:"#ef8fa4"};
+const rainColor = "#93a0b5";
 
 document.getElementById("chart-legend").innerHTML = nodes.map(n=>
   `<div class="li"><i style="background:${nodeColors[n.id]};color:${nodeColors[n.id]}"></i>${n.name}</div>`
@@ -2153,7 +2112,6 @@ function buildNodeDetailCards(){
       <div class="nd-head">
         <div>
           <div class="nd-name"><i style="background:${nodeColors[n.id]};color:${nodeColors[n.id]}"></i>${n.name}</div>
-          <div class="nd-sub" id="nd-sub-${n.id}">—</div>
         </div>
         <div class="nd-health" id="nd-health-${n.id}">
           <div class="h-val">—</div>
@@ -2187,7 +2145,7 @@ function buildNodeDetailCards(){
 function areaFill(ctx, color){
   const h = ctx.canvas.height || 120;
   const g = ctx.createLinearGradient(0, 0, 0, h);
-  g.addColorStop(0, color + "66");
+  g.addColorStop(0, color + "26");
   g.addColorStop(1, color + "00");
   return g;
 }
@@ -2229,9 +2187,6 @@ function updateNodeDetail(){
     hEl.querySelector(".h-val").textContent = offline || (liveMode && last.soil >= SOIL_FAULT_FLOOR) ? "—" : last.health;
     document.getElementById(`nd-zone-${n.id}`).innerHTML =
       offline ? "offline" : `${zone.label}${zone.est ? ' <span class="est">est.</span>' : ''}`;
-
-    document.getElementById(`nd-sub-${n.id}`).textContent =
-      offline ? `offline · ${n.failReason || "no packets"}` : `soil ${last.soil} · water ${last.water}`;
 
     const c = nodeCharts[n.id];
     if (!c) return;
@@ -2841,7 +2796,6 @@ document.getElementById("export-csv").addEventListener("click", ()=>{
   mark();
 })();
 
-setInterval(()=>{ document.getElementById("clock").textContent = new Date().toLocaleTimeString([], {hour12:false}); }, 1000);
 
 /* ---- boot ---- */
 const START_IN_DEMO = new URLSearchParams(location.search).get("mode") === "demo";

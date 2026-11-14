@@ -11,74 +11,66 @@
   /* Same surfaces, spacing and palette as dev.html, so the two pages read as
      one product rather than two prototypes. */
   :root{
-    --bg:#f4f6fb; --bg-soft:#ebeff7; --card:#ffffff; --card-border:#dfe5f0;
-    --ink:#0e1626; --ink-soft:#414e6b; --muted:#5d6a85; --line:#e9edf6;
-    --green:#0d7a54; --green-bg:#e0f3ea; --accent:#3a56d4;
+    --bg:#f7f8f6; --bg-soft:#eef0ec; --card:#ffffff; --card-border:#e3e6e1;
+    --ink:#0f1311; --ink-soft:#454d48; --muted:#5e665f; --line:#ecefe9;
+    --green:#0d7a54; --green-bg:#e0f3ea; --accent:#3f6b12;
     --amber:#8a5c0a; --amber-bg:#fbf0d7;
     --red:#b2382b; --red-bg:#fbe7e3;
     --water:#1a6ca8; --water-bg:#e5eef6;
-    --purple:#5747a8; --purple-bg:#e9e7f6;
+    --purple:#4f5a6b; --purple-bg:#eaedf1;
     --radius:18px; --radius-sm:12px; --radius-xs:9px;
-    --card-shadow:0 1px 2px rgba(16,24,40,.04);
-    --card-top:transparent;
+    --card-shadow:none;
+    --card-top:var(--card-border);
     --text-glow:none;
     --dot-glow:0 0 0 transparent;
     --badge-glow:none;
     --ring-glow:none;
-    --glass:linear-gradient(180deg, rgba(255,255,255,.6), rgba(255,255,255,.3));
-    --glass-fill:rgba(255,255,255,.86);
-    --glass-blur:blur(8px) saturate(115%);
-    --page-glow:radial-gradient(900px 480px at 12% -8%, rgba(58,86,212,.07), transparent 62%),
-                radial-gradient(760px 420px at 96% 4%, rgba(87,71,168,.055), transparent 62%);
+    --glass:none;
+    --glass-fill:var(--card);
+    --glass-blur:none;
     --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --bg:#070d1b; --bg-soft:#16213a; --card:#111a2e; --card-border:#223052;
-      --ink:#eef2fa; --ink-soft:#a7b4d0; --muted:#8191ae; --line:#1d2742;
-      --green:#3ddc97; --green-bg:#0c2e24; --accent:#6d8bff;
-      --amber:#f3b24c; --amber-bg:#2f2412;
-      --red:#f87a72; --red-bg:#351c1e;
-      --water:#4fb0e8; --water-bg:#0f2638;
-      --purple:#a789f8; --purple-bg:#201b3e;
-      --card-shadow:0 10px 30px rgba(0,0,0,.45);
-      --card-top:rgba(255,255,255,.07);
-      --glass:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.012));
-      --glass-fill:rgba(17,26,46,.72);
-      --glass-blur:blur(14px) saturate(140%);
-      --page-glow:radial-gradient(900px 520px at 14% -6%, rgba(109,139,255,.17), transparent 60%),
-                  radial-gradient(720px 440px at 94% 6%, rgba(167,137,248,.13), transparent 60%),
-                  radial-gradient(820px 520px at 62% 104%, rgba(79,209,197,.075), transparent 60%);
-      --text-glow:0 0 22px rgba(160,185,255,.28);
-      --dot-glow:0 0 9px;
-      --badge-glow:0 0 14px -4px currentColor;
-      --ring-glow:0 0 26px -4px var(--accent);
+      --bg:#0a0c0b; --bg-soft:#141816; --card:#111513; --card-border:#1f2522;
+      --ink:#eef2ef; --ink-soft:#a6b0aa; --muted:#868f88; --line:#1b211e;
+      --green:#3ddc97; --green-bg:#0d2a1f; --accent:#cdf25a;
+      --amber:#f3b24c; --amber-bg:#2d2411;
+      --red:#f87a72; --red-bg:#331b19;
+      --water:#5bb4e8; --water-bg:#0e2433;
+      --purple:#93a0b5; --purple-bg:#1a2029;
+      --card-shadow:none;
+      --card-top:var(--card-border);
+      --glass:none;
+      --glass-fill:var(--card);
+      --glass-blur:none;
+      --text-glow:none;
+      --dot-glow:0 0 0 transparent;
+      --badge-glow:none;
+      --ring-glow:none;
     }
   }
   :root[data-theme="dark"]{
-    --bg:#070d1b; --bg-soft:#16213a; --card:#111a2e; --card-border:#223052;
-    --ink:#eef2fa; --ink-soft:#a7b4d0; --muted:#8191ae; --line:#1d2742;
-    --green:#3ddc97; --green-bg:#0c2e24; --accent:#6d8bff;
-    --amber:#f3b24c; --amber-bg:#2f2412;
-    --red:#f87a72; --red-bg:#351c1e;
-    --water:#4fb0e8; --water-bg:#0f2638;
-    --purple:#a789f8; --purple-bg:#201b3e;
-      --card-shadow:0 10px 30px rgba(0,0,0,.45);
-      --card-top:rgba(255,255,255,.07);
-      --glass:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.012));
-      --glass-fill:rgba(17,26,46,.72);
-      --glass-blur:blur(14px) saturate(140%);
-      --page-glow:radial-gradient(900px 520px at 14% -6%, rgba(109,139,255,.17), transparent 60%),
-                  radial-gradient(720px 440px at 94% 6%, rgba(167,137,248,.13), transparent 60%),
-                  radial-gradient(820px 520px at 62% 104%, rgba(79,209,197,.075), transparent 60%);
-      --text-glow:0 0 22px rgba(160,185,255,.28);
-      --dot-glow:0 0 9px;
-      --badge-glow:0 0 14px -4px currentColor;
-      --ring-glow:0 0 26px -4px var(--accent);
+    --bg:#0a0c0b; --bg-soft:#141816; --card:#111513; --card-border:#1f2522;
+    --ink:#eef2ef; --ink-soft:#a6b0aa; --muted:#868f88; --line:#1b211e;
+    --green:#3ddc97; --green-bg:#0d2a1f; --accent:#cdf25a;
+    --amber:#f3b24c; --amber-bg:#2d2411;
+    --red:#f87a72; --red-bg:#331b19;
+    --water:#5bb4e8; --water-bg:#0e2433;
+    --purple:#93a0b5; --purple-bg:#1a2029;
+      --card-shadow:none;
+      --card-top:var(--card-border);
+      --glass:none;
+      --glass-fill:var(--card);
+      --glass-blur:none;
+      --text-glow:none;
+      --dot-glow:0 0 0 transparent;
+      --badge-glow:none;
+      --ring-glow:none;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
-  body{background:var(--page-glow), var(--bg); color:var(--ink); background-attachment:fixed; font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; font-size:13.5px; -webkit-font-smoothing:antialiased;}
+  body{background:var(--bg); color:var(--ink); font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; font-size:13.5px; -webkit-font-smoothing:antialiased;}
   h1,h2,h3,h4,h5{margin:0; letter-spacing:-.02em;}
   a{color:var(--water); text-decoration:none;}
 
@@ -253,12 +245,12 @@
   .row-badge, .outlook, .st-delta.up, .st-delta.down{ box-shadow:var(--badge-glow); }
   .row-badge.planned, .row-badge.quiet, .row-badge.offline{ box-shadow:none; }
   .sb-nav a.on{
-    background:linear-gradient(90deg, rgba(109,139,255,.16), rgba(109,139,255,.04));
-    box-shadow:inset 0 0 0 1px rgba(109,139,255,.14);
+    background:var(--bg-soft);
+    box-shadow:inset 2px 0 0 var(--accent);
   }
-  .sb-nav a.on svg{ filter:drop-shadow(0 0 6px var(--accent)); }
+  .sb-nav a.on svg{ color:var(--accent); opacity:1; }
   .rain-gauge-dial{ box-shadow:var(--ring-glow); }
-  .node-chip.active{ box-shadow:0 0 18px -6px var(--accent); }
+  .node-chip.active{ box-shadow:none; }
 </style>
 </head>
 <body>
