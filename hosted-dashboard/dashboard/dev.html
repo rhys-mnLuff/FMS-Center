@@ -15,14 +15,20 @@
      neutral page. Surfaces are white, generously padded and lightly
      rounded; colour is reserved for state. */
   :root{
-    --bg:#f7f8f6; --bg-soft:#eef0ec; --card:#ffffff; --card-border:#e3e6e1;
-    --ink:#0f1311; --ink-soft:#454d48; --muted:#5e665f; --line:#ecefe9;
-    --green:#0d7a54; --green-bg:#e0f3ea; --accent:#3f6b12;
-    --amber:#8a5c0a; --amber-bg:#fbf0d7;
-    --red:#b2382b; --red-bg:#fbe7e3;
-    --water:#1a6ca8; --water-bg:#e5eef6;
-    --purple:#4f5a6b; --purple-bg:#eaedf1;
-    --radius:18px; --radius-sm:12px; --radius-xs:9px;
+    --bg:#eceded; --bg-soft:#f3efe0; --card:#fdfbf4; --card-border:#eae5d4;
+    --ink:#1a1a17; --ink-soft:#55534a; --muted:#6d6a5d; --line:#efead9;
+    --green:#1a6b4a; --green-bg:#e3f0e6; --accent:#1b1a16;
+    --amber:#7d5405; --amber-bg:#fbeec4;
+    --red:#a8352a; --red-bg:#f8e3df;
+    --water:#1d6288; --water-bg:#e4edf3;
+    --purple:#4b5564; --purple-bg:#eaeaea;
+    --series-1:#2a6f97; --series-2:#c0611f; --series-3:#1f7a6b; --series-rain:#8a8578;
+    /* The reference's background: cool grey at the top left warming to butter
+       at the right. A fixed gradient, so it does not slide while scrolling. */
+    --page-bg:radial-gradient(1100px 820px at 104% 0%, #fbe384 0%, rgba(251,227,132,0) 62%),
+              radial-gradient(1000px 760px at 88% 100%, #fbeeae 0%, rgba(251,238,174,0) 64%),
+              linear-gradient(115deg, #e7e8e9 0%, #eeebdf 40%, #f7eec2 72%, #fbeaa6 100%);
+    --radius:22px; --radius-sm:14px; --radius-xs:10px;
     --card-shadow:none;
     --card-top:var(--card-border);
     --text-glow:none;
@@ -44,6 +50,8 @@
       --red:#f87a72; --red-bg:#331b19;
       --water:#5bb4e8; --water-bg:#0e2433;
       --purple:#93a0b5; --purple-bg:#1a2029;
+      --series-1:#cdf25a; --series-2:#5bb4e8; --series-3:#ef8fa4; --series-rain:#93a0b5;
+      --page-bg:none;
       --card-shadow:0 10px 28px rgba(0,0,0,.38);
       --card-top:rgba(255,255,255,.045);
       --text-glow:none;
@@ -64,6 +72,8 @@
     --red:#f87a72; --red-bg:#331b19;
     --water:#5bb4e8; --water-bg:#0e2433;
     --purple:#93a0b5; --purple-bg:#1a2029;
+      --series-1:#cdf25a; --series-2:#5bb4e8; --series-3:#ef8fa4; --series-rain:#93a0b5;
+      --page-bg:none;
     --card-shadow:0 10px 28px rgba(0,0,0,.38);
       --card-top:rgba(255,255,255,.045);
       --text-glow:none;
@@ -79,7 +89,8 @@
   html,body{margin:0;padding:0;}
   html{scroll-behavior:smooth; scroll-padding-top:18px;}
   body{
-    background:var(--bg); color:var(--ink);
+    background:var(--page-bg), var(--bg); color:var(--ink);
+    background-attachment:fixed;
     font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     min-height:100vh; font-size:13.5px; -webkit-font-smoothing:antialiased;
   }
@@ -688,10 +699,9 @@ const THEME_KEY = "floodwatch-theme";
 function systemPrefersDark(){ return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches; }
 function applyThemeAttr(theme){ if (theme) document.documentElement.setAttribute("data-theme", theme); else document.documentElement.removeAttribute("data-theme"); }
 function effectiveTheme(){ return document.documentElement.getAttribute("data-theme") || (systemPrefersDark() ? "dark" : "light"); }
-// Dark is the product's own look, so it is the default rather than whatever
-// the operating system happens to be set to. A saved choice still wins, and
-// the Appearance toggle still switches both ways.
-(function initTheme(){ let saved=null; try{saved=localStorage.getItem(THEME_KEY);}catch(e){} applyThemeAttr(saved || "dark"); })();
+// Light is the default now that it carries the brand look. A saved choice
+// still wins, and the Appearance toggle still switches both ways.
+(function initTheme(){ let saved=null; try{saved=localStorage.getItem(THEME_KEY);}catch(e){} applyThemeAttr(saved || "light"); })();
 
 /* =========================================================================
    OFFLINE FALLBACKS
@@ -1459,14 +1469,19 @@ function renderEventsTable(){
 
 
 /* ---- charts ---- */
-Chart.defaults.color = "#5d6a85";
+Chart.defaults.color = "#6d6a5d";
 Chart.defaults.font.family = "'Inter', sans-serif";
 Chart.defaults.font.size = 11;
 Chart.defaults.borderColor = "#e9edf6";
 // A series palette, not a severity one: these three say "node 1/2/3", and
 // nothing in a chart line should read as an alert colour by accident.
-const nodeColors = {1:"#cdf25a", 2:"#5bb4e8", 3:"#ef8fa4"};
-const rainColor = "#93a0b5";
+// Series colours come from CSS so each theme can carry its own set: the lime
+// that reads on near-black is invisible on the light theme's cream. Read live
+// on every access, so a theme switch needs no bookkeeping here.
+const nodeColors = new Proxy({}, {
+  get: (_t, k) => cssVar("--series-" + String(k)) || "#888"
+});
+Object.defineProperty(window, "rainColor", { get: () => cssVar("--series-rain") });
 
 document.getElementById("chart-legend").innerHTML = nodes.map(n=>
   `<div class="li"><i style="background:${nodeColors[n.id]};color:${nodeColors[n.id]}"></i>${n.name}</div>`
@@ -1537,6 +1552,11 @@ function applyChartTheme(){
   const bgSoft = cs.getPropertyValue("--bg-soft").trim();
   Chart.defaults.color = muted;
   Chart.defaults.borderColor = line;
+  // Series colours are per theme, so the lines themselves have to be repainted
+  // and anything that drew a colour swatch re-rendered.
+  [chartSoil,chartWater,chartHealth,chartRisk,chartRate,chartBattery].forEach(c=>{
+    nodes.forEach((n,i)=>{ if (c.data.datasets[i]) c.data.datasets[i].borderColor = nodeColors[n.id]; });
+  });
   [chartSoil,chartWater,chartHealth,chartRisk,chartRate,chartRain,chartBattery].forEach(c=>{
     c.options.scales.y.grid.color = bgSoft;
     c.update();
@@ -1550,6 +1570,13 @@ function applyChartTheme(){
       c.update();
     });
   });
+  Object.entries(nodeCharts).forEach(([id, pair])=>{
+    [pair.soil, pair.water].forEach(c=>{ if (c && c.data.datasets[0]) c.data.datasets[0].borderColor = nodeColors[id]; });
+  });
+  if (typeof renderNodeChips === "function") renderNodeChips();
+  const legend = document.getElementById("chart-legend");
+  if (legend) legend.innerHTML = nodes.map(n=>
+    `<div class="li"><i style="background:${nodeColors[n.id]};color:${nodeColors[n.id]}"></i>${n.name}</div>`).join("");
   if (predictChart){
     predictChart.options.scales.y.grid.color = line;
     predictChart.update();
